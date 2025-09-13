@@ -91,7 +91,17 @@ public class PaymentController {
             // 4. Persistência de dados direto no controller (Violação Single Responsibility Principle)
             UUID pagamentoId = UUID.randomUUID();
             try (Connection conn = dataSource.getConnection()) {
-                Receipt receipt;
+                // Salvar informações do pagamento
+                String sqlPagamento = "INSERT INTO PAYMENTS (ID, PAYMENT_METHOD, AMOUNT, STATUS, EMAIL, CREATED_AT) VALUES (?, ?, ?, ?, ?, ?)";
+                PreparedStatement stmtPagamento = conn.prepareStatement(sqlPagamento);
+                stmtPagamento.setObject(1, pagamentoId);
+                stmtPagamento.setString(2, tipo);
+                stmtPagamento.setBigDecimal(3, valor);
+                stmtPagamento.setString(4, PaymentStatus.APPROVED.name());
+                stmtPagamento.setString(5, chavePix);
+                stmtPagamento.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
+                stmtPagamento.executeUpdate();
+
                 // Tentar salvar comprovante no MongoDB
                 String receiptData = generateReceiptData(tipo, valor, pagamentoId.toString());
                 try {
@@ -100,7 +110,7 @@ public class PaymentController {
                             .receiptData(receiptData)
                             .createdAt(LocalDateTime.now())
                             .build();
-                    receipt = receiptRepository.save(r);
+                    receiptRepository.save(r);
                     System.out.println("Comprovante salvo no MongoDB para pagamento: " + pagamentoId);
                 } catch (Exception mongoEx) {
                     // fallback: salvar em tabela SQL se Mongo não estiver disponível
@@ -141,7 +151,6 @@ public class PaymentController {
 
             // Agora a busca no MongoDB vai funcionar
             Optional<Receipt> receiptOptional = receiptRepository.findById(paymentId);
-
 
             if (receiptOptional.isPresent()) {
                 responseDTO.setReceiptData(receiptOptional.get().getReceiptData());
