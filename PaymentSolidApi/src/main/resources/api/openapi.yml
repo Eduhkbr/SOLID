@@ -266,9 +266,10 @@ components:
           description: Status atual do pagamento
           enum:
             - PENDING
+            - PROCESSING
             - APPROVED
             - REJECTED
-            - CANCELLED
+            - REFUNDED
           example: "APPROVED"
         paymentMethod:
           type: string

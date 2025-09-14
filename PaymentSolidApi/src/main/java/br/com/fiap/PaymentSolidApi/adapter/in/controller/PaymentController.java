@@ -109,7 +109,7 @@ public class PaymentController {
                 stmtPagamento.executeUpdate();
 
                 // Tentar salvar comprovante no MongoDB
-                String receiptData = generateReceiptData(tipo, valor, pagamentoId.toString());
+                String receiptData = generateReceiptData(tipo, valor, pagamentoId.toString(), PaymentStatus.APPROVED);
                 try {
                     Receipt r = Receipt.builder()
                             .paymentId(pagamentoId)
@@ -246,22 +246,53 @@ public class PaymentController {
     // Um endpoint de estorno que não se aplica a todos os tipos de pagamento
     @PostMapping("/refund/{id}")
     public ResponseEntity<String> refund(@PathVariable String id) {
-        // Lógica de estorno...
-        // Problema: PIX e Boleto não podem ser estornados da mesma forma que um Cartão.
-        // O código aqui teria que fazer um "if" no tipo de pagamento para decidir o que fazer,
-        // o que é um sintoma de violação do Liskov Substitution Principle.
-        // LSP: Nem todos os tipos de pagamento podem ser estornados da mesma forma
-        // PIX: não permite estorno
-        // Boleto: precisa de cancelamento antes do vencimento
-        // Cartão: permite estorno total
-        // Isso força diferentes comportamentos para o mesmo metodo
-        System.out.println("Estornando pagamento com ID: " + id);
-        return ResponseEntity.ok("Pagamento estornado com sucesso.");
+        try {
+            UUID pagamentoId = UUID.fromString(id);
+
+            try (Connection conn = dataSource.getConnection()) {
+                String sql = "SELECT PAYMENT_METHOD, STATUS FROM PAYMENTS WHERE ID = ?";
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                stmt.setObject(1, pagamentoId);
+                ResultSet rs = stmt.executeQuery();
+
+                if (!rs.next()) {
+                    return ResponseEntity.noContent().build();
+                }
+
+                String metodo = rs.getString("PAYMENT_METHOD");
+
+                // VIOLAÇÃO LSP/ISP: comportamento diferente para cada tipo
+                return switch (metodo) {
+                    case "PIX" -> ResponseEntity.badRequest().body("PIX não permite estorno.");
+                    case "BOLETO" -> {
+                        atualizarStatusParaRefunded(conn, pagamentoId);
+                        yield ResponseEntity.ok("Boleto cancelado com sucesso.");
+                    }
+                    case "CARTAO" -> {
+                        atualizarStatusParaRefunded(conn, pagamentoId);
+                        yield ResponseEntity.ok("Estorno no cartão realizado com sucesso.");
+                    }
+                    default -> ResponseEntity.badRequest().body("Tipo de pagamento não suportado.");
+                };
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro ao processar estorno.");
+        }
     }
 
+    // Atualiza o status do pagamento para REFUNDED no banco.
+    private void atualizarStatusParaRefunded(Connection conn, UUID pagamentoId) throws SQLException {
+        String updateSql = "UPDATE PAYMENTS SET STATUS = ? WHERE ID = ?";
+        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+            updateStmt.setString(1, PaymentStatus.REFUNDED.name());
+            updateStmt.setObject(2, pagamentoId);
+            updateStmt.executeUpdate();
+        }
+    }
 
     // Metodo para gerar dados do comprovante
-    private String generateReceiptData(String tipo, BigDecimal valor, String pagamentoId) {
+    private String generateReceiptData(String tipo, BigDecimal valor, String pagamentoId, PaymentStatus status) {
         // Exemplo simples de geração de comprovante
         return String.format(
                 "COMPROVANTE DE PAGAMENTO\n" +
@@ -269,11 +300,12 @@ public class PaymentController {
                         "Tipo: %s\n" +
                         "Valor: R$ %.2f\n" +
                         "Data: %s\n" +
-                        "Status: APROVADO",
+                        "Status: %s",
                 pagamentoId,
                 tipo,
                 valor,
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                status
         );
     }
 }
