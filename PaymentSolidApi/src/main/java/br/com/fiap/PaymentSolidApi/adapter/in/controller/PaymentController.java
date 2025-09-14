@@ -5,6 +5,7 @@ import java.sql.*;
 import javax.sql.DataSource;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -150,47 +151,49 @@ public class PaymentController {
     @ApiResponse(responseCode = "204", description = "Comprovante de pagamento não encontrado")
     @GetMapping("/receipt/{id}")
     public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable String id) {
-        ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
         try {
             UUID paymentId = UUID.fromString(id);
 
-            // Agora a busca no MongoDB vai funcionar
+            // Busca no MongoDB
             Optional<Receipt> receiptOptional = receiptRepository.findById(paymentId);
-
             if (receiptOptional.isPresent()) {
-                responseDTO.setReceiptData(receiptOptional.get().getReceiptData());
-                responseDTO.setPaymentId(receiptOptional.get().getPaymentId());
-                responseDTO.setCreatedAt(OffsetDateTime.from(receiptOptional.get().getCreatedAt()));
+                Receipt receipt = receiptOptional.get();
+                ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
+                responseDTO.setReceiptData(receipt.getReceiptData());
+                responseDTO.setPaymentId(receipt.getPaymentId());
+                LocalDateTime createdAt = receipt.getCreatedAt();
+                ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
+                responseDTO.setCreatedAt(createdAt.atZone(zoneId).toOffsetDateTime());
+                return ResponseEntity.ok(responseDTO);
             }
-        }catch (Exception mongoEx){
-            try {
-                UUID pagamentoId = UUID.fromString(id);
-                Connection conn = dataSource.getConnection();
 
-                // Salvar informações do pagamento
-                String sqlPagamento = "SELECT * FROM PAYMENT_RECEIPTS WHERE PAYMENT_ID = ?";
-                PreparedStatement stmtPagamento = conn.prepareStatement(sqlPagamento);
-                stmtPagamento.setObject(1, pagamentoId);
-                stmtPagamento.executeQuery();
-                ResultSet rs = stmtPagamento.executeQuery();
+            // Busca no Postgres
+            try (Connection conn = dataSource.getConnection()) {
+                String sql = "SELECT * FROM PAYMENT_RECEIPTS WHERE PAYMENT_ID = ?";
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                stmt.setObject(1, paymentId);
+                ResultSet rs = stmt.executeQuery();
 
                 if (rs.next()) {
                     // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
+                    ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
                     responseDTO.setPaymentId(rs.getObject("PAYMENT_ID", UUID.class));
                     responseDTO.setReceiptData(rs.getString("RECEIPT_DATA"));
 
                     Timestamp createdAtTimestamp = rs.getTimestamp("CREATED_AT");
                     LocalDateTime createdAt = createdAtTimestamp.toLocalDateTime();
-                    responseDTO.setCreatedAt(OffsetDateTime.from(createdAt));
-                }
+                    ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
+                    responseDTO.setCreatedAt(createdAt.atZone(zoneId).toOffsetDateTime());
 
-                conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-                return ResponseEntity.status(500).body(null);
+                    return ResponseEntity.ok(responseDTO);
+                }
             }
+            return ResponseEntity.noContent().build();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.ok(responseDTO);
     }
 
     @Operation(
@@ -201,38 +204,41 @@ public class PaymentController {
     @ApiResponse(responseCode = "204", description = "Pagamento não encontrado")
     @GetMapping("/{id}")
     public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable String id) {
-        PaymentResponseDTO responseDTO = new PaymentResponseDTO();
         try {
             // VIOLAÇÃO SRP e DIP: Lógica de acesso ao banco de dados direto no controller.
             // O controller agora é responsável por saber como se conectar e consultar o banco.
 
             // 4. Persistência de dados direto no controller (Violação Single Responsibility Principle)
             UUID pagamentoId = UUID.fromString(id);
-            Connection conn = dataSource.getConnection();
 
-            // Salvar informações do pagamento
-            String sqlPagamento = "SELECT ID, PAYMENT_METHOD, AMOUNT, STATUS, CREATED_AT FROM PAYMENTS WHERE ID = ?";
-            PreparedStatement stmtPagamento = conn.prepareStatement(sqlPagamento);
-            stmtPagamento.setObject(1, pagamentoId);
-            stmtPagamento.executeQuery();
-            ResultSet rs = stmtPagamento.executeQuery();
+            try (Connection conn = dataSource.getConnection()) {
+                String sql = "SELECT ID, PAYMENT_METHOD, AMOUNT, STATUS, CREATED_AT FROM PAYMENTS WHERE ID = ?";
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                stmt.setObject(1, pagamentoId);
+                ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
-                responseDTO.setPaymentId(rs.getObject("ID", UUID.class));
-                responseDTO.setPaymentMethod(PaymentResponseDTO.PaymentMethodEnum.valueOf(rs.getString("PAYMENT_METHOD")));
-                responseDTO.setAmount(rs.getBigDecimal("AMOUNT"));
-                responseDTO.setStatus(PaymentResponseDTO.StatusEnum.valueOf(rs.getString("STATUS")));
-                // Converte Timestamp para LocalDateTime
-                responseDTO.setProcessedAt(OffsetDateTime.from(rs.getTimestamp("CREATED_AT").toLocalDateTime()));
+                if (rs.next()) {
+                    // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
+                    PaymentResponseDTO responseDTO = new PaymentResponseDTO();
+                    responseDTO.setPaymentId(rs.getObject("ID", UUID.class));
+                    responseDTO.setPaymentMethod(PaymentResponseDTO.PaymentMethodEnum.valueOf(rs.getString("PAYMENT_METHOD")));
+                    responseDTO.setAmount(rs.getBigDecimal("AMOUNT"));
+                    responseDTO.setStatus(PaymentResponseDTO.StatusEnum.valueOf(rs.getString("STATUS")));
+
+                    Timestamp createdAtTimestamp = rs.getTimestamp("CREATED_AT");
+                    LocalDateTime createdAt = createdAtTimestamp.toLocalDateTime();
+                    ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
+                    responseDTO.setProcessedAt(createdAt.atZone(zoneId).toOffsetDateTime());
+
+                    return ResponseEntity.ok(responseDTO);
+                }
             }
+            return ResponseEntity.noContent().build();
 
-            conn.close();
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body(null);
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.ok(responseDTO);
     }
 
 
