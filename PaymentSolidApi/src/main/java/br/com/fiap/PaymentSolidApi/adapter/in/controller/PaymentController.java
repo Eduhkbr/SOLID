@@ -268,7 +268,7 @@ public class PaymentController {
                         atualizarStatusParaRefunded(conn, pagamentoId);
                         yield ResponseEntity.ok("Boleto cancelado com sucesso.");
                     }
-                    case "CARTAO" -> {
+                    case "CREDIT_CARD" -> {
                         atualizarStatusParaRefunded(conn, pagamentoId);
                         yield ResponseEntity.ok("Estorno no cartão realizado com sucesso.");
                     }
@@ -283,10 +283,11 @@ public class PaymentController {
 
     // Atualiza o status do pagamento para REFUNDED no banco.
     private void atualizarStatusParaRefunded(Connection conn, UUID pagamentoId) throws SQLException {
-        String updateSql = "UPDATE PAYMENTS SET STATUS = ? WHERE ID = ?";
+        String updateSql = "UPDATE PAYMENTS SET STATUS = ?, UPDATED_AT = ? WHERE ID = ?";
         try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
             updateStmt.setString(1, PaymentStatus.REFUNDED.name());
-            updateStmt.setObject(2, pagamentoId);
+            updateStmt.setTimestamp(2, new java.sql.Timestamp(System.currentTimeMillis()));;
+            updateStmt.setObject(3, pagamentoId);
             updateStmt.executeUpdate();
         }
     }
