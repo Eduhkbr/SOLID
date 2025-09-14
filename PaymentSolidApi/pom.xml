@@ -12,19 +12,19 @@
     <artifactId>PaymentSolidApi</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>PaymentSolidApi</name>
-    <description>Demo project for Spring Boot</description>
+    <description>API para processar e gerenciar pagamentos através de diferentes métodos (Cartão de Crédito, PIX, Boleto)</description>
 
     <properties>
         <java.version>21</java.version>
         <springdoc.version>2.3.0</springdoc.version>
+        <jackson-databind-nullable.version>0.2.6</jackson-databind-nullable.version>
+        <byte-buddy-agent.version>1.17.7</byte-buddy-agent.version>
+        <lombok.version>1.18.38</lombok.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
     <dependencies>
-        <!-- Spring Boot Starters -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -55,24 +55,16 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-
-        <!-- Monitoring -->
         <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-prometheus</artifactId>
-            <scope>runtime</scope>
+            <groupId>org.openapitools</groupId>
+            <artifactId>jackson-databind-nullable</artifactId>
+            <version>${jackson-databind-nullable.version}</version>
         </dependency>
 
         <!-- Database Drivers -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <!-- In-memory DB for development and testing -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
         <!-- Flyway for database migrations -->
@@ -89,6 +81,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -111,10 +104,25 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>${byte-buddy-agent.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+
         <plugins>
+            <!-- Lombok annotation processor -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -123,13 +131,21 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
+            <!-- Spring Boot repackaging -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals><goal>repackage</goal></goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <excludes>
                         <exclude>
@@ -139,6 +155,66 @@
                     </excludes>
                 </configuration>
             </plugin>
+
+            <!-- OpenAPI Generator -->
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>7.13.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-spring-interfaces</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/api/openapi.yml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <apiPackage>br.com.fiap.paymentsolidiapi.api</apiPackage>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useJakartaEe>true</useJakartaEe>
+                                <useSpringBoot>true</useSpringBoot>
+                                <useTags>true</useTags>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Build Helper (add generated sources) -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>add-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/openapi/src/main/java</source>
+                                <source>${project.build.directory}/generated-sources/annotations</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Surefire: carrega o Byte-Buddy Agent como Java Agent -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <argLine>
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                        --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+                        -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy-agent.version}/byte-buddy-agent-${byte-buddy-agent.version}.jar
+                    </argLine>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 </project>

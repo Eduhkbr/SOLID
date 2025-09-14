@@ -1,0 +1,341 @@
+openapi: 3.0.3
+info:
+  title: API de Gerenciamento de Pagamentos
+  description: API para processar e gerenciar pagamentos através de diferentes métodos (Cartão de Crédito, PIX, Boleto)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8082/api
+    description: Servidor de Desenvolvimento
+
+tags:
+  - name: Pagamentos
+    description: Operações relacionadas ao processamento de pagamentos
+
+paths:
+  /payments:
+    post:
+      tags:
+        - Pagamentos
+      summary: Criar Novo Pagamento
+      description: Processa um novo pagamento no sistema
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequestDTO'
+            examples:
+              credit_card:
+                summary: Pagamento com Cartão de Crédito
+                value:
+                  paymentMethod: "CREDIT_CARD"
+                  amount: 150.75
+                  cardNumber: "1234567890123456"
+                  cvv: "123"
+              pix:
+                summary: Pagamento com PIX
+                value:
+                  paymentMethod: "PIX"
+                  amount: 89.90
+                  pixKey: "email@example.com"
+              boleto:
+                summary: Pagamento com Boleto
+                value:
+                  paymentMethod: "BOLETO"
+                  amount: 250.00
+      responses:
+        '201':
+          description: Pagamento criado com sucesso
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Pagamento processado com sucesso! ID: a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        '400':
+          description: Dados de pagamento inválidos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Valor do pagamento é inválido."
+              examples:
+                invalid_amount:
+                  value: "Valor do pagamento é inválido."
+                missing_payment_method:
+                  value: "Tipo de pagamento é obrigatório."
+                invalid_card:
+                  value: "Número do cartão inválido."
+                invalid_cvv:
+                  value: "CVV do cartão inválido."
+                missing_pix_key:
+                  value: "Chave PIX é obrigatória."
+                unsupported_method:
+                  value: "Tipo de pagamento não suportado."
+        '500':
+          description: Erro interno do servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Erro interno no processamento do pagamento."
+
+  /payments/{id}:
+    get:
+      tags:
+        - Pagamentos
+      summary: Buscar um Pagamento
+      description: Busca um pagamento no sistema pelo ID
+      operationId: findPaymentById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único do pagamento
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      responses:
+        '200':
+          description: Pagamento encontrado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponseDTO'
+        '204':
+          description: Pagamento não encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Pagamento não encontrado"
+        '500':
+          description: Erro interno do servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                nullable: true
+
+  /payments/receipt/{id}:
+    get:
+      tags:
+        - Pagamentos
+      summary: Buscar um Comprovante de pagamento
+      description: Busca um comprovante de pagamento no sistema pelo ID do pagamento
+      operationId: findReceiptById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único do pagamento
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      responses:
+        '200':
+          description: Comprovante de pagamento encontrado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptResponseDTO'
+        '204':
+          description: Comprovante de pagamento não encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Comprovante não encontrado"
+        '500':
+          description: Erro interno do servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                nullable: true
+
+  /payments/refund/{id}:
+    post:
+      tags:
+        - Pagamentos
+      summary: Estornar Pagamento
+      description: |
+        Realiza o estorno de um pagamento. 
+        **Importante:** Nem todos os tipos de pagamento suportam estorno da mesma forma:
+        - **PIX:** Não permite estorno automático
+        - **Boleto:** Precisa de cancelamento antes do vencimento
+        - **Cartão de Crédito:** Permite estorno total
+      operationId: refundPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único do pagamento a ser estornado
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      responses:
+        '200':
+          description: Pagamento estornado com sucesso
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Pagamento estornado com sucesso."
+        '400':
+          description: Pagamento não pode ser estornado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Este tipo de pagamento não pode ser estornado."
+        '204':
+          description: Pagamento não encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Pagamento não encontrado."
+        '500':
+          description: Erro interno do servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Erro interno no processamento do estorno."
+
+components:
+  schemas:
+    PaymentRequestDTO:
+      type: object
+      description: Dados para processar um novo pagamento
+      required:
+        - paymentMethod
+        - amount
+      properties:
+        paymentMethod:
+          type: string
+          description: Método de pagamento
+          enum:
+            - CREDIT_CARD
+            - PIX
+            - BOLETO
+          example: "CREDIT_CARD"
+        amount:
+          type: number
+          format: decimal
+          description: Valor do pagamento
+          minimum: 0.01
+          example: 150.75
+        cardNumber:
+          type: string
+          description: Número do cartão de crédito (necessário para CREDIT_CARD)
+          pattern: '^[0-9]{16}$'
+          example: "1234567890123456"
+        cvv:
+          type: string
+          description: CVV do cartão de crédito (necessário para CREDIT_CARD)
+          pattern: '^[0-9]{3}$'
+          example: "123"
+        pixKey:
+          type: string
+          description: "Chave PIX. Deve ser informada apenas quando 'paymentMethod' for 'PIX'. Se for enviada para outro tipo de pagamento, o endpoint retornará erro."
+          example: "email@example.com"
+
+    PaymentResponseDTO:
+      type: object
+      description: Dados retornados após o processamento de um pagamento
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+          description: ID único do pagamento gerado
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        status:
+          type: string
+          description: Status atual do pagamento
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - CANCELLED
+          example: "APPROVED"
+        paymentMethod:
+          type: string
+          description: Método de pagamento utilizado
+          enum:
+            - CREDIT_CARD
+            - PIX
+            - BOLETO
+          example: "CREDIT_CARD"
+        amount:
+          type: number
+          format: decimal
+          description: Valor do pagamento processado
+          example: 150.75
+        message:
+          type: string
+          description: Mensagem de confirmação
+          example: "Pagamento processado com sucesso."
+        processedAt:
+          type: string
+          format: date-time
+          description: Data e hora em que o pagamento foi processado
+          example: "2025-09-13T18:45:00"
+
+    ReceiptResponseDTO:
+      type: object
+      description: Dados do comprovante de pagamento
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+          description: ID do pagamento associado a este comprovante
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        receiptData:
+          type: string
+          description: Conteúdo do comprovante, geralmente em formato de texto
+          example: |
+            COMPROVANTE DE PAGAMENTO
+            ID: a1b2c3d4-e5f6-7890-1234-567890abcdef
+            Tipo: CREDIT_CARD
+            Valor: R$ 150,75
+            Data: 2025-09-13T18:45:00
+            Status: APROVADO
+        createdAt:
+          type: string
+          format: date-time
+          description: Data e hora em que o comprovante foi gerado
+          example: "2025-09-13T18:45:00"
+
+  examples:
+    PaymentCreditCard:
+      summary: Pagamento com Cartão de Crédito
+      value:
+        paymentMethod: "CREDIT_CARD"
+        amount: 150.75
+        cardNumber: "1234567890123456"
+        cvv: "123"
+
+    PaymentPix:
+      summary: Pagamento com PIX
+      value:
+        paymentMethod: "PIX"
+        amount: 89.90
+        pixKey: "email@example.com"
+
+    PaymentBoleto:
+      summary: Pagamento com Boleto
+      value:
+        paymentMethod: "BOLETO"
+        amount: 250.00

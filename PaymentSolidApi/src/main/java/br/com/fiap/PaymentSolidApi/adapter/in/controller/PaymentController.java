@@ -4,18 +4,20 @@ import java.math.BigDecimal;
 import java.sql.*;
 import javax.sql.DataSource;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-import br.com.fiap.PaymentSolidApi.adapter.in.dto.PaymentResponseDTO;
-import br.com.fiap.PaymentSolidApi.adapter.in.dto.ReceiptResponseDTO;
+import org.openapitools.model.PaymentRequestDTO;
+import org.openapitools.model.ReceiptResponseDTO;
+import org.openapitools.model.PaymentResponseDTO;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import br.com.fiap.PaymentSolidApi.PaymentStatus;
 import br.com.fiap.PaymentSolidApi.Receipt;
 import br.com.fiap.PaymentSolidApi.ReceiptRepository;
-import br.com.fiap.PaymentSolidApi.adapter.in.dto.PaymentRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,7 +45,7 @@ public class PaymentController {
     public ResponseEntity<String> process(@RequestBody PaymentRequestDTO request) {
         try {
             // Extração de dados do request
-            String tipo = request.getPaymentMethod();
+            String tipo = request.getPaymentMethod().getValue();
             BigDecimal valor = request.getAmount();
             String chavePix = null;
 
@@ -56,6 +58,10 @@ public class PaymentController {
             }
             if (tipo == null || tipo.isBlank()) {
                 return ResponseEntity.badRequest().body("Tipo de pagamento é obrigatório.");
+            }
+            chavePix = request.getPixKey();
+            if ((tipo.equals("CREDIT_CARD") || tipo.equals("BOLETO")) && (chavePix != null && !chavePix.isBlank())) {
+                return ResponseEntity.badRequest().body("Chave PIX não deve ser incluída para pagamento por " + tipo + ".");
             }
 
             // 2. Lógica de negócio no controller (Violação Single Responsibility Principle e Open/Closed Principle)
@@ -74,7 +80,6 @@ public class PaymentController {
                 System.out.println("Validando limite do cartão...");
                 System.out.println("Processando pagamento com Cartão de Crédito no valor de " + valor);
             } else if (tipo.equals("PIX")) {
-                chavePix = request.getPixKey();
                 if (chavePix == null || chavePix.isBlank()) {
                     return ResponseEntity.badRequest().body("Chave PIX é obrigatória.");
                 }
@@ -142,7 +147,7 @@ public class PaymentController {
             description = "Busca um Comprovante de pagamento no sistema"
     )
     @ApiResponse(responseCode = "200", description = "Comprovante de pagamento encontrado com sucesso")
-    @ApiResponse(responseCode = "404", description = "Comprovante de pagamento não encontrado")
+    @ApiResponse(responseCode = "204", description = "Comprovante de pagamento não encontrado")
     @GetMapping("/receipt/{id}")
     public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable String id) {
         ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
@@ -155,7 +160,7 @@ public class PaymentController {
             if (receiptOptional.isPresent()) {
                 responseDTO.setReceiptData(receiptOptional.get().getReceiptData());
                 responseDTO.setPaymentId(receiptOptional.get().getPaymentId());
-                responseDTO.setCreatedAt(receiptOptional.get().getCreatedAt());
+                responseDTO.setCreatedAt(OffsetDateTime.from(receiptOptional.get().getCreatedAt()));
             }
         }catch (Exception mongoEx){
             try {
@@ -176,7 +181,7 @@ public class PaymentController {
 
                     Timestamp createdAtTimestamp = rs.getTimestamp("CREATED_AT");
                     LocalDateTime createdAt = createdAtTimestamp.toLocalDateTime();
-                    responseDTO.setCreatedAt(createdAt);
+                    responseDTO.setCreatedAt(OffsetDateTime.from(createdAt));
                 }
 
                 conn.close();
@@ -193,7 +198,7 @@ public class PaymentController {
             description = "Busca um pagamento no sistema"
     )
     @ApiResponse(responseCode = "200", description = "Pagamento encontrado com sucesso")
-    @ApiResponse(responseCode = "404", description = "Pagamento não encontrado")
+    @ApiResponse(responseCode = "204", description = "Pagamento não encontrado")
     @GetMapping("/{id}")
     public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable String id) {
         PaymentResponseDTO responseDTO = new PaymentResponseDTO();
@@ -215,11 +220,11 @@ public class PaymentController {
             if (rs.next()) {
                 // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
                 responseDTO.setPaymentId(rs.getObject("ID", UUID.class));
-                responseDTO.setPaymentMethod(rs.getString("PAYMENT_METHOD"));
+                responseDTO.setPaymentMethod(PaymentResponseDTO.PaymentMethodEnum.valueOf(rs.getString("PAYMENT_METHOD")));
                 responseDTO.setAmount(rs.getBigDecimal("AMOUNT"));
-                responseDTO.setStatus(rs.getString("STATUS"));
+                responseDTO.setStatus(PaymentResponseDTO.StatusEnum.valueOf(rs.getString("STATUS")));
                 // Converte Timestamp para LocalDateTime
-                responseDTO.setProcessedAt(rs.getTimestamp("CREATED_AT").toLocalDateTime());
+                responseDTO.setProcessedAt(OffsetDateTime.from(rs.getTimestamp("CREATED_AT").toLocalDateTime()));
             }
 
             conn.close();
