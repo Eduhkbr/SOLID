@@ -49,10 +49,9 @@ paths:
         '201':
           description: Pagamento criado com sucesso
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: "Pagamento processado com sucesso! ID: a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                $ref: '#/components/schemas/PaymentResponseDTO'
         '400':
           description: Dados de pagamento inválidos
           content:

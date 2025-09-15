@@ -1,6 +1,7 @@
 package br.com.fiap.PaymentSolidApi.infrastructure.adapter.in.controller;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.sql.*;
 import javax.sql.DataSource;
 import java.time.LocalDateTime;
@@ -8,7 +9,10 @@ import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
+import br.com.fiap.PaymentSolidApi.application.port.in.PaymentService;
+import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.PaymentMapper;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity.ReceiptJpaEntity;
+import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.repository.mongo.ReceiptRepository;
 import br.com.fiap.paymentsolidiapi.api.PaymentsApi;
 import org.openapitools.model.PaymentRequestDTO;
 import org.openapitools.model.ReceiptResponseDTO;
@@ -18,7 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
-import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.repository.ReceiptRepository;
 
 @RestController
 @RequestMapping("/api")
@@ -26,111 +29,20 @@ public class PaymentController implements PaymentsApi {
 
     private final DataSource dataSource;
     private final ReceiptRepository receiptRepository;
+    private final PaymentService paymentService;
 
-    public PaymentController(DataSource dataSource, ReceiptRepository receiptRepository) {
+    public PaymentController(DataSource dataSource, ReceiptRepository receiptRepository, PaymentService paymentService) {
+        this.paymentService = paymentService;
         this.dataSource = dataSource;
         this.receiptRepository = receiptRepository;
     }
 
     @Override
-    public ResponseEntity<String> createPayment(@RequestBody PaymentRequestDTO request) {
-        try {
-            // Extração de dados do request
-            String tipo = request.getPaymentMethod().getValue();
-            BigDecimal valor = request.getAmount();
-            String chavePix = null;
+    public ResponseEntity<PaymentResponseDTO> createPayment(@RequestBody PaymentRequestDTO request) {
+        final var createdPayment = paymentService.create(PaymentMapper.fromRequestDto(request));
+        final var uri = URI.create("/api/payments/" + createdPayment.getId());
 
-            // VIOLAÇÃO DE TODOS OS PRINCÍPIPIOS SOLID
-
-            // 1. Validação misturada (Violação Single Responsibility Principle)
-            // SRP: Controller fazendo validação (deveria ser responsabilidade de um Validator)
-            if (valor == null || valor.compareTo(BigDecimal.ZERO) <= 0) {
-                return ResponseEntity.badRequest().body("Valor do pagamento é inválido.");
-            }
-            if (tipo == null || tipo.isBlank()) {
-                return ResponseEntity.badRequest().body("Tipo de pagamento é obrigatório.");
-            }
-            chavePix = request.getPixKey();
-            if ((tipo.equals("CREDIT_CARD") || tipo.equals("BOLETO")) && (chavePix != null && !chavePix.isBlank())) {
-                return ResponseEntity.badRequest().body("Chave PIX não deve ser incluída para pagamento por " + tipo + ".");
-            }
-
-            // 2. Lógica de negócio no controller (Violação Single Responsibility Principle e Open/Closed Principle)
-            if (tipo.equals("CREDIT_CARD")) {
-                String numeroCartao = request.getCardNumber();
-                String cvv = request.getCvv();
-
-                // Validação de cartão inline
-                if (numeroCartao == null || numeroCartao.length() != 16) {
-                    return ResponseEntity.badRequest().body("Número do cartão inválido.");
-                }
-                if (cvv == null || cvv.length() != 3) {
-                    return ResponseEntity.badRequest().body("CVV do cartão inválido.");
-                }
-
-                System.out.println("Validando limite do cartão...");
-                System.out.println("Processando pagamento com Cartão de Crédito no valor de " + valor);
-            } else if (tipo.equals("PIX")) {
-                if (chavePix == null || chavePix.isBlank()) {
-                    return ResponseEntity.badRequest().body("Chave PIX é obrigatória.");
-                }
-                System.out.println("Processando pagamento com PIX no valor de " + valor);
-                System.out.println("Gerando QR Code para a chave: " + chavePix);
-
-            } else if (tipo.equals("BOLETO")) {
-                System.out.println("Processando pagamento com Boleto no valor de " + valor);
-                System.out.println("Gerando linha digitável e enviando para o e-mail do cliente.");
-            } else {
-                return ResponseEntity.badRequest().body("Tipo de pagamento não suportado.");
-            }
-
-            // 4. Persistência de dados direto no controller (Violação Single Responsibility Principle)
-            UUID pagamentoId = UUID.randomUUID();
-            try (Connection conn = dataSource.getConnection()) {
-                // Salvar informações do pagamento
-                String sqlPagamento = "INSERT INTO PAYMENTS (ID, PAYMENT_METHOD, AMOUNT, STATUS, EMAIL, CREATED_AT) VALUES (?, ?, ?, ?, ?, ?)";
-                PreparedStatement stmtPagamento = conn.prepareStatement(sqlPagamento);
-                stmtPagamento.setObject(1, pagamentoId);
-                stmtPagamento.setString(2, tipo);
-                stmtPagamento.setBigDecimal(3, valor);
-                stmtPagamento.setString(4, PaymentStatus.APPROVED.name());
-                stmtPagamento.setString(5, chavePix);
-                stmtPagamento.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
-                stmtPagamento.executeUpdate();
-
-                // Tentar salvar comprovante no MongoDB
-                String receiptData = generateReceiptData(tipo, valor, pagamentoId.toString(), PaymentStatus.APPROVED);
-                try {
-                    ReceiptJpaEntity r = ReceiptJpaEntity.builder()
-                            .paymentId(pagamentoId)
-                            .receiptData(receiptData)
-                            .createdAt(LocalDateTime.now())
-                            .build();
-                    receiptRepository.save(r);
-                    System.out.println("Comprovante salvo no MongoDB para pagamento: " + pagamentoId);
-                } catch (Exception mongoEx) {
-                    // fallback: salvar em tabela SQL se Mongo não estiver disponível
-                    String sqlComprovante = "INSERT INTO PAYMENT_RECEIPTS (PAYMENT_ID, RECEIPT_DATA, CREATED_AT) VALUES (?, ?, ?)";
-                    PreparedStatement stmtComprovante = conn.prepareStatement(sqlComprovante);
-                    stmtComprovante.setObject(1, pagamentoId);
-                    stmtComprovante.setString(2, receiptData);
-                    stmtComprovante.setTimestamp(3, new java.sql.Timestamp(System.currentTimeMillis()));
-                    stmtComprovante.executeUpdate();
-
-                    System.out.println("Comprovante salvo no banco relacional (fallback) para pagamento: " + pagamentoId);
-                }
-                conn.close();
-
-                System.out.println("Pagamento salvo no banco de dados com ID: " + pagamentoId);
-                System.out.println("Comprovante gerado e salvo.");
-            }
-
-            return ResponseEntity.ok("Pagamento processado com sucesso! ID: " + pagamentoId);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Erro interno no processamento do pagamento.");
-        }
+        return ResponseEntity.created(uri).body(PaymentMapper.toResponseDto(createdPayment));
     }
 
     @Override

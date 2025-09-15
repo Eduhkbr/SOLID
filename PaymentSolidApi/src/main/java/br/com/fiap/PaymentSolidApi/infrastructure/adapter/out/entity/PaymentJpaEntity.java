@@ -2,6 +2,7 @@ package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
 import jakarta.persistence.Column;
@@ -24,7 +25,7 @@ import lombok.NoArgsConstructor;
 public class PaymentJpaEntity {
 
     @Id
-    private String id;
+    private UUID id;
 
     @Column(name = "PAYMENT_METHOD", nullable = false)
     private String paymentMethod;
