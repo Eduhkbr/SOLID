@@ -9,14 +9,14 @@ servers:
     description: Servidor de Desenvolvimento
 
 tags:
-  - name: Pagamentos
+  - name: Payments
     description: Operações relacionadas ao processamento de pagamentos
 
 paths:
   /payments:
     post:
       tags:
-        - Pagamentos
+        - Payments
       summary: Criar Novo Pagamento
       description: Processa um novo pagamento no sistema
       operationId: createPayment
@@ -84,7 +84,7 @@ paths:
   /payments/{id}:
     get:
       tags:
-        - Pagamentos
+        - Payments
       summary: Buscar um Pagamento
       description: Busca um pagamento no sistema pelo ID
       operationId: findPaymentById
@@ -125,7 +125,7 @@ paths:
   /payments/receipt/{id}:
     get:
       tags:
-        - Pagamentos
+        - Payments
       summary: Buscar um Comprovante de pagamento
       description: Busca um comprovante de pagamento no sistema pelo ID do pagamento
       operationId: findReceiptById
@@ -166,7 +166,7 @@ paths:
   /payments/refund/{id}:
     post:
       tags:
-        - Pagamentos
+        - Payments
       summary: Estornar Pagamento
       description: |
         Realiza o estorno de um pagamento. 

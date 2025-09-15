@@ -1,14 +1,15 @@
-package br.com.fiap.PaymentSolidApi.adapter.in.controller;
+package br.com.fiap.PaymentSolidApi.infrastructure.adapter.in.controller;
 
 import java.math.BigDecimal;
 import java.sql.*;
 import javax.sql.DataSource;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
+import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity.ReceiptJpaEntity;
+import br.com.fiap.paymentsolidiapi.api.PaymentsApi;
 import org.openapitools.model.PaymentRequestDTO;
 import org.openapitools.model.ReceiptResponseDTO;
 import org.openapitools.model.PaymentResponseDTO;
@@ -16,17 +17,12 @@ import org.openapitools.model.PaymentResponseDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import br.com.fiap.PaymentSolidApi.PaymentStatus;
-import br.com.fiap.PaymentSolidApi.Receipt;
-import br.com.fiap.PaymentSolidApi.ReceiptRepository;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
+import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.repository.ReceiptRepository;
 
-@Tag(name = "Pagamentos", description = "API de Gerenciamento de Pagamentos")
 @RestController
-@RequestMapping("/api/payments")
-public class PaymentController {
+@RequestMapping("/api")
+public class PaymentController implements PaymentsApi {
 
     private final DataSource dataSource;
     private final ReceiptRepository receiptRepository;
@@ -36,14 +32,8 @@ public class PaymentController {
         this.receiptRepository = receiptRepository;
     }
 
-    @Operation(
-            summary = "Criar Novo Pagamento",
-            description = "Processa um novo pagamento no sistema"
-    )
-    @ApiResponse(responseCode = "201", description = "Pagamento criado com sucesso")
-    @ApiResponse(responseCode = "400", description = "Dados de pagamento inválidos")
-    @PostMapping
-    public ResponseEntity<String> process(@RequestBody PaymentRequestDTO request) {
+    @Override
+    public ResponseEntity<String> createPayment(@RequestBody PaymentRequestDTO request) {
         try {
             // Extração de dados do request
             String tipo = request.getPaymentMethod().getValue();
@@ -111,7 +101,7 @@ public class PaymentController {
                 // Tentar salvar comprovante no MongoDB
                 String receiptData = generateReceiptData(tipo, valor, pagamentoId.toString(), PaymentStatus.APPROVED);
                 try {
-                    Receipt r = Receipt.builder()
+                    ReceiptJpaEntity r = ReceiptJpaEntity.builder()
                             .paymentId(pagamentoId)
                             .receiptData(receiptData)
                             .createdAt(LocalDateTime.now())
@@ -143,25 +133,17 @@ public class PaymentController {
         }
     }
 
-    @Operation(
-            summary = "Buscar um Comprovante de pagamento",
-            description = "Busca um Comprovante de pagamento no sistema"
-    )
-    @ApiResponse(responseCode = "200", description = "Comprovante de pagamento encontrado com sucesso")
-    @ApiResponse(responseCode = "204", description = "Comprovante de pagamento não encontrado")
-    @GetMapping("/receipt/{id}")
-    public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable String id) {
+    @Override
+    public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable("id") UUID id) {
         try {
-            UUID paymentId = UUID.fromString(id);
-
             // Busca no MongoDB
-            Optional<Receipt> receiptOptional = receiptRepository.findById(paymentId);
+            Optional<ReceiptJpaEntity> receiptOptional = receiptRepository.findById(id);
             if (receiptOptional.isPresent()) {
-                Receipt receipt = receiptOptional.get();
+                ReceiptJpaEntity receiptJpaEntity = receiptOptional.get();
                 ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
-                responseDTO.setReceiptData(receipt.getReceiptData());
-                responseDTO.setPaymentId(receipt.getPaymentId());
-                LocalDateTime createdAt = receipt.getCreatedAt();
+                responseDTO.setReceiptData(receiptJpaEntity.getReceiptData());
+                responseDTO.setPaymentId(receiptJpaEntity.getPaymentId());
+                LocalDateTime createdAt = receiptJpaEntity.getCreatedAt();
                 ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
                 responseDTO.setCreatedAt(createdAt.atZone(zoneId).toOffsetDateTime());
                 return ResponseEntity.ok(responseDTO);
@@ -171,11 +153,10 @@ public class PaymentController {
             try (Connection conn = dataSource.getConnection()) {
                 String sql = "SELECT * FROM PAYMENT_RECEIPTS WHERE PAYMENT_ID = ?";
                 PreparedStatement stmt = conn.prepareStatement(sql);
-                stmt.setObject(1, paymentId);
+                stmt.setObject(1, id);
                 ResultSet rs = stmt.executeQuery();
 
                 if (rs.next()) {
-                    // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
                     ReceiptResponseDTO responseDTO = new ReceiptResponseDTO();
                     responseDTO.setPaymentId(rs.getObject("PAYMENT_ID", UUID.class));
                     responseDTO.setReceiptData(rs.getString("RECEIPT_DATA"));
@@ -196,29 +177,16 @@ public class PaymentController {
         }
     }
 
-    @Operation(
-            summary = "Buscar um Pagamento",
-            description = "Busca um pagamento no sistema"
-    )
-    @ApiResponse(responseCode = "200", description = "Pagamento encontrado com sucesso")
-    @ApiResponse(responseCode = "204", description = "Pagamento não encontrado")
-    @GetMapping("/{id}")
-    public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable String id) {
+    @Override
+    public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable("id") UUID id) {
         try {
-            // VIOLAÇÃO SRP e DIP: Lógica de acesso ao banco de dados direto no controller.
-            // O controller agora é responsável por saber como se conectar e consultar o banco.
-
-            // 4. Persistência de dados direto no controller (Violação Single Responsibility Principle)
-            UUID pagamentoId = UUID.fromString(id);
-
             try (Connection conn = dataSource.getConnection()) {
                 String sql = "SELECT ID, PAYMENT_METHOD, AMOUNT, STATUS, CREATED_AT FROM PAYMENTS WHERE ID = ?";
                 PreparedStatement stmt = conn.prepareStatement(sql);
-                stmt.setObject(1, pagamentoId);
+                stmt.setObject(1, id);
                 ResultSet rs = stmt.executeQuery();
 
                 if (rs.next()) {
-                    // VIOLAÇÃO SRP: Controller responsável por mapear o resultado do banco para um DTO.
                     PaymentResponseDTO responseDTO = new PaymentResponseDTO();
                     responseDTO.setPaymentId(rs.getObject("ID", UUID.class));
                     responseDTO.setPaymentMethod(PaymentResponseDTO.PaymentMethodEnum.valueOf(rs.getString("PAYMENT_METHOD")));
@@ -241,18 +209,13 @@ public class PaymentController {
         }
     }
 
-
-    // Violação Liskov Substitution Principle e Interface Segregation Principle:
-    // Um endpoint de estorno que não se aplica a todos os tipos de pagamento
-    @PostMapping("/refund/{id}")
-    public ResponseEntity<String> refund(@PathVariable String id) {
+    @Override
+    public ResponseEntity<String> refundPayment(@PathVariable("id") UUID id) {
         try {
-            UUID pagamentoId = UUID.fromString(id);
-
             try (Connection conn = dataSource.getConnection()) {
                 String sql = "SELECT PAYMENT_METHOD, STATUS FROM PAYMENTS WHERE ID = ?";
                 PreparedStatement stmt = conn.prepareStatement(sql);
-                stmt.setObject(1, pagamentoId);
+                stmt.setObject(1, id);
                 ResultSet rs = stmt.executeQuery();
 
                 if (!rs.next()) {
@@ -265,11 +228,11 @@ public class PaymentController {
                 return switch (metodo) {
                     case "PIX" -> ResponseEntity.badRequest().body("PIX não permite estorno.");
                     case "BOLETO" -> {
-                        atualizarStatusParaRefunded(conn, pagamentoId);
+                        atualizarStatusParaRefunded(conn, id);
                         yield ResponseEntity.ok("Boleto cancelado com sucesso.");
                     }
                     case "CREDIT_CARD" -> {
-                        atualizarStatusParaRefunded(conn, pagamentoId);
+                        atualizarStatusParaRefunded(conn, id);
                         yield ResponseEntity.ok("Estorno no cartão realizado com sucesso.");
                     }
                     default -> ResponseEntity.badRequest().body("Tipo de pagamento não suportado.");

@@ -1,4 +1,4 @@
-package br.com.fiap.PaymentSolidApi;
+package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Receipt {
+public class ReceiptJpaEntity {
     @Id
     private UUID paymentId;
 

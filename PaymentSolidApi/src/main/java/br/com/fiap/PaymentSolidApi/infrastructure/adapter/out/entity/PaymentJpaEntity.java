@@ -1,7 +1,9 @@
-package br.com.fiap.PaymentSolidApi;
+package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -19,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Payment {
+public class PaymentJpaEntity {
 
     @Id
     private String id;
