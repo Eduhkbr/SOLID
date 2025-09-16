@@ -44,6 +44,14 @@ public class PaymentController implements PaymentsApi {
 
         return ResponseEntity.created(uri).body(PaymentMapper.toResponseDto(createdPayment));
     }
+    
+    @Override
+    public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable("id") UUID id) {
+        var paymentOpt = paymentService.findById(id);
+        return paymentOpt.map(payment ->
+                ResponseEntity.ok(PaymentMapper.toResponseDto(payment))).orElseGet(() ->
+                ResponseEntity.noContent().build());
+    }
 
     @Override
     public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable("id") UUID id) {
@@ -77,38 +85,6 @@ public class PaymentController implements PaymentsApi {
                     LocalDateTime createdAt = createdAtTimestamp.toLocalDateTime();
                     ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
                     responseDTO.setCreatedAt(createdAt.atZone(zoneId).toOffsetDateTime());
-
-                    return ResponseEntity.ok(responseDTO);
-                }
-            }
-            return ResponseEntity.noContent().build();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).build();
-        }
-    }
-
-    @Override
-    public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable("id") UUID id) {
-        try {
-            try (Connection conn = dataSource.getConnection()) {
-                String sql = "SELECT ID, PAYMENT_METHOD, AMOUNT, STATUS, CREATED_AT FROM PAYMENTS WHERE ID = ?";
-                PreparedStatement stmt = conn.prepareStatement(sql);
-                stmt.setObject(1, id);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    PaymentResponseDTO responseDTO = new PaymentResponseDTO();
-                    responseDTO.setPaymentId(rs.getObject("ID", UUID.class));
-                    responseDTO.setPaymentMethod(PaymentResponseDTO.PaymentMethodEnum.valueOf(rs.getString("PAYMENT_METHOD")));
-                    responseDTO.setAmount(rs.getBigDecimal("AMOUNT"));
-                    responseDTO.setStatus(PaymentResponseDTO.StatusEnum.valueOf(rs.getString("STATUS")));
-
-                    Timestamp createdAtTimestamp = rs.getTimestamp("CREATED_AT");
-                    LocalDateTime createdAt = createdAtTimestamp.toLocalDateTime();
-                    ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
-                    responseDTO.setProcessedAt(createdAt.atZone(zoneId).toOffsetDateTime());
 
                     return ResponseEntity.ok(responseDTO);
                 }
