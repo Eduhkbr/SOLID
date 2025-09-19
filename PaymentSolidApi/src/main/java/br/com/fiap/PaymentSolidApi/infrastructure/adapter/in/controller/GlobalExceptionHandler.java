@@ -1,6 +1,7 @@
 package br.com.fiap.PaymentSolidApi.infrastructure.adapter.in.controller;
 
 import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentNotFoundException;
+import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentRefundException;
 import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,15 @@ public class GlobalExceptionHandler {
         error.put("error", "Erro de validação");
         error.put("details", ex.getErrors());
         return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(PaymentRefundException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ResponseEntity<Map<String, String>> handlePaymentRefundException(PaymentRefundException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Conflito ao processar estorno");
+        error.put("details", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

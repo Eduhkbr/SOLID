@@ -10,4 +10,6 @@ public interface PaymentService {
     Payment create(Payment payment);
 
     Optional<Payment> findById(UUID id);
+
+    Payment refundPayment(UUID id);
 }

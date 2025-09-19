@@ -187,10 +187,9 @@ paths:
         '200':
           description: Pagamento estornado com sucesso
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: "Pagamento estornado com sucesso."
+                $ref: '#/components/schemas/PaymentResponseDTO'
         '400':
           description: Pagamento não pode ser estornado
           content:

@@ -1,9 +1,10 @@
-package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out;
+package br.com.fiap.PaymentSolidApi.infrastructure.adapter;
 
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 import br.com.fiap.PaymentSolidApi.application.port.out.PaymentRepository;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.entity.PaymentJpaEntity;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.repository.jpa.PaymentJpaRepository;
+import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.repository.mappers.PaymentMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
