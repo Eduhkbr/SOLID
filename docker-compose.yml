@@ -29,6 +29,7 @@ services:
     # Garante que os dados sejam mantidos mesmo após reiniciar o contêiner
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
 
   # Serviço de Mensageria RabbitMQ
   rabbitmq:
