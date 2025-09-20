@@ -1,0 +1,105 @@
+# Versão do Docker Compose
+# 3.8 é uma versão moderna com suporte a recursos avançados
+version: '3.8'
+
+# Definição de serviços que compõem a arquitetura da aplicação
+services:
+
+  # Serviço de Banco de Dados PostgreSQL
+  postgres:
+    # Imagem oficial do PostgreSQL versão 17
+    image: postgres:17
+
+    # Nome personalizado do contêiner para fácil identificação
+    container_name: postgres_db
+
+    # Configurações de ambiente para inicialização do banco
+    environment:
+      # Credenciais de acesso (para ambiente de desenvolvimento)
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Nome do banco de dados inicial
+      POSTGRES_DB: paymentdb
+
+    # Mapeamento de portas: host:contêiner
+    ports:
+      - "5432:5432"
+
+    # Volume para persistência de dados
+    # Garante que os dados sejam mantidos mesmo após reiniciar o contêiner
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Serviço de Mensageria RabbitMQ
+  rabbitmq:
+    # Imagem do RabbitMQ com interface de gerenciamento
+    image: rabbitmq:4.1-management
+
+    container_name: rabbitmq_broker
+
+    # Exposição de portas:
+    # 5672 - Porta padrão para aplicações
+    # 15672 - Interface web de gerenciamento
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+    # Credenciais padrão
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  # Microsserviço de Pagamentos
+  payment-api:
+    # Build a partir de Dockerfile específico
+    build:
+      # Contexto do build (caminho para a pasta do projeto)
+      context: ./PaymentSolidApi
+      # Dockerfile específico para este serviço
+      dockerfile: Dockerfile
+
+    container_name: payment_api_service
+
+    # Mapeamento de porta para acesso externo
+    ports:
+      - "8082:8082"
+
+    # Variáveis de ambiente para configuração
+    environment:
+      # Configurações de porta e conexão
+      - SERVER_PORT=8082
+      # Conexão com PostgreSQL usando nome do serviço
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
+      # Conexão com RabbitMQ usando nome do serviço
+      - SPRING_RABBITMQ_HOST=rabbitmq
+
+    # Dependências: garante que PostgreSQL e RabbitMQ iniciem antes
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  # Microsserviço de Comprovantes
+  receipt-api:
+    # Configuração similar ao payment-api
+    build:
+      context: ./ReceiptApi
+      dockerfile: Dockerfile
+
+    container_name: receipt_api_service
+
+    ports:
+      - "8083:8083"
+
+    environment:
+      - SERVER_PORT=8083
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
+      - SPRING_RABBITMQ_HOST=rabbitmq
+
+    depends_on:
+      - postgres
+      - rabbitmq
+
+# Definição de volumes para persistência de dados
+volumes:
+  # Volume nomeado para dados do PostgreSQL
+  postgres_data:

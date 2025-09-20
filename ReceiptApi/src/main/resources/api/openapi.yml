@@ -1,0 +1,63 @@
+openapi: 3.0.3
+info:
+  title: API de Gerenciamento de Comprovantes
+  description: API para consultar comprovantes de pagamentos gerados de forma assíncrona.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8083/api # Nota: porta diferente para o novo serviço
+    description: Servidor de Desenvolvimento
+
+tags:
+  - name: Comprovantes
+    description: Operações relacionadas à consulta de comprovantes
+
+paths:
+  /receipts/{paymentId}:
+    get:
+      tags:
+        - Comprovantes
+      summary: Buscar Comprovante pelo ID do Pagamento
+      description: Retorna o comprovante associado a um ID de pagamento específico.
+      operationId: findReceiptByPaymentId
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: ID do pagamento para o qual o comprovante foi gerado
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Comprovante encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptResponseDTO'
+        '204':
+          description: Comprovante não encontrado para o ID de pagamento informado.
+
+components:
+  schemas:
+    ReceiptResponseDTO:
+      type: object
+      description: Dados do comprovante de pagamento.
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+          description: ID do pagamento associado.
+        receiptData:
+          type: string
+          description: Conteúdo textual do comprovante.
+          example: |
+            COMPROVANTE DE PAGAMENTO
+            ID: a1b2c3d4-e5f6-7890-1234-567890abcdef
+            Valor: R$ 150,75
+            Data: 2025-09-20T13:11:00
+            Status: APROVADO
+        createdAt:
+          type: string
+          format: date-time
+          description: Data e hora em que o comprovante foi gerado.

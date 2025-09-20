@@ -3,7 +3,7 @@ package br.com.fiap.PaymentSolidApi.application.service;
 import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentNotFoundException;
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 import br.com.fiap.PaymentSolidApi.application.port.in.PaymentService;
-import br.com.fiap.PaymentSolidApi.application.port.in.ReceiptService;
+import br.com.fiap.PaymentSolidApi.application.port.out.PaymentEventPublisherPort;
 import br.com.fiap.PaymentSolidApi.application.port.out.PaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,16 +15,20 @@ import java.util.UUID;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final ReceiptService receiptService;
+    private final PaymentEventPublisherPort paymentEventPublisher;
 
-    public PaymentServiceImpl(PaymentRepository paymentRepository, ReceiptService receiptService) {
+    public PaymentServiceImpl(PaymentRepository paymentRepository, PaymentEventPublisherPort paymentEventPublisher) {
+        this.paymentEventPublisher = paymentEventPublisher;
         this.paymentRepository = paymentRepository;
-        this.receiptService = receiptService;
     }
 
     @Override
     public Payment create(Payment payment) {
-        return paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+
+        paymentEventPublisher.publishPaymentProcessedEvent(savedPayment);
+
+        return savedPayment;
     }
 
     @Override
@@ -39,9 +43,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new PaymentNotFoundException(id.toString()));
 
         payment.refund();
-
-        Payment refundedPayment = paymentRepository.save(payment);
-        receiptService.updateForRefund(refundedPayment);
 
         return paymentRepository.save(payment);
     }

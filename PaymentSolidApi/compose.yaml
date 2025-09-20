@@ -1,12 +1,4 @@
 services:
-  mongodb:
-    image: 'mongo:latest'
-    environment:
-      - 'MONGO_INITDB_DATABASE=paymentdb'
-      - 'MONGO_INITDB_ROOT_PASSWORD=mandragora'
-      - 'MONGO_INITDB_ROOT_USERNAME=mandragora'
-    ports:
-      - '27017:27017'
   postgres:
     image: 'postgres:latest'
     environment:
@@ -15,3 +7,12 @@ services:
       - 'POSTGRES_USER=postgres'
     ports:
       - '5432:5432'
+  rabbitmq:
+    image: "rabbitmq:4.1-management"
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"  # Porta para comunicação AMQP
+      - "15672:15672" # Interface de gerenciamento web
+    environment:
+      RABBITMQT_DEFAULT_USER: "guest"
+      RABBITMQT_DEFAULT_PASS: "guest"
