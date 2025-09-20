@@ -25,6 +25,10 @@ RUN mvn clean install -DskipTests
 # Isso torna a imagem final muito menor e mais segura removendo ferramentas de build
 FROM eclipse-temurin:21-jre-jammy
 
+# Cria um grupo e um usuário de sistema dedicados para a aplicação.
+# --system cria um usuário sem home directory
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+
 # Define o diretório de trabalho.
 WORKDIR /app
 
@@ -34,8 +38,16 @@ ARG JAR_FILE=target/*.jar
 # Copia o .jar gerado no STAGE 1 para a imagem final.
 COPY --from=build /app/${JAR_FILE} app.jar
 
+# Define a propriedade do diretório e do arquivo para o novo usuário.
+# Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
+RUN chown -R appuser:appgroup /app
+
+# Muda o contexto de execução para o usuário não-root.
+# A partir deste ponto, todos os comandos subsequentes serão executados como 'appuser'.
+USER appuser
+
 # Expõe a porta que a aplicação Spring Boot usa por padrão.
-EXPOSE 8080
+EXPOSE 8082
 
 # Definição do ponto de entrada da aplicação
 # Executa JAR diretamente com Java

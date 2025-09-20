@@ -1,0 +1,44 @@
+# Ignore a pasta de output do Maven.
+../ReceiptApi/target/
+
+# Ignore os diretórios do Maven wrapper. A imagem de build já tem o Maven.
+.mvn/
+mvnw
+mvnw.cmd
+
+# Ignore o diretório do Git
+.git/
+.gitignore
+.gitattributes
+
+# Ignore arquivos e pastas de configuração de IDEs.
+# IntelliJ
+.idea/
+*.iml
+*.iws
+
+# Eclipse
+.settings/
+.project
+.classpath
+
+# VS Code
+.vscode/
+
+# Ignore arquivos de log
+*.log
+npm-debug.log
+
+# Ignore os próprios arquivos do Docker, eles não precisam estar no contexto.
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Ignore arquivos de sistema operacional
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+
+# Ignore arquivos de documentação que não são necessários na imagem
+README.md
