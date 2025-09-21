@@ -52,6 +52,10 @@ services:
 
   # Microsserviço de Pagamentos
   payment-api:
+
+    # Imagem Docker personalizada (comentada para usar build local)
+    #image: eduhkbr/payment-api:0.0.1
+
     # Build a partir de Dockerfile específico
     build:
       # Contexto do build (caminho para a pasta do projeto)
