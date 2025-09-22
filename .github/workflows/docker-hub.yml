@@ -1,0 +1,61 @@
+name: CI/CD com Docker e Docker Hub
+
+on:
+  push:
+    branches:
+      - feat/docker
+
+jobs:
+  build-and-push:
+    name: Build e Push para o Docker Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Logar no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir e fazer push da imagem payment-api
+        uses: docker/build-push-action@v5
+        with:
+          context: ./PaymentSolidApi
+          file: ./PaymentSolidApi/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/payment-api:latest
+
+      - name: Construir e fazer push da imagem receipt-api
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ReceiptApi
+          file: ./ReceiptApi/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/receipt-api:latest
+
+  deploy:
+    name: Deploy da aplicação
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Logar no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Executar Docker Compose para deploy
+        run: |
+          docker-compose -f docker-compose.yml up -d --force-recreate
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASS: ${{ secrets.RABBITMQ_PASS }}

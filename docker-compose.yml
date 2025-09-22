@@ -17,8 +17,8 @@ services:
     # Configurações de ambiente para inicialização do banco
     environment:
       # Credenciais de acesso (para ambiente de desenvolvimento)
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # Nome do banco de dados inicial
       POSTGRES_DB: paymentdb
 
@@ -58,8 +58,8 @@ services:
 
     # Credenciais padrão
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
 
   # Microsserviço de Pagamentos
   payment-api:
@@ -91,8 +91,13 @@ services:
       - SERVER_PORT=8082
       # Conexão com PostgreSQL usando nome do serviço
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
-      # Conexão com RabbitMQ usando nome do serviço
+      # As próximas variáveis são lidas de variáveis de ambiente do SO
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - # Credenciais do RabbitMQ
       - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
 
     # Dependências: garante que PostgreSQL e RabbitMQ iniciem antes
     depends_on:
@@ -120,6 +125,10 @@ services:
       - SERVER_PORT=8083
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
       - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
 
     depends_on:
       - postgres
