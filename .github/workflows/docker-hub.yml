@@ -53,7 +53,7 @@ jobs:
 
       - name: Executar Docker Compose para deploy
         run: |
-          docker-compose -f docker-compose.yml up -d --force-recreate
+          docker compose -f docker-compose.yml up -d --force-recreate
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
