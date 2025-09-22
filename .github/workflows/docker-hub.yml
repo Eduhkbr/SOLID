@@ -37,25 +37,17 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/receipt-api:latest
 
   deploy:
-    name: Deploy da aplicação
+    name: Deploy Simulado em Cloud
     runs-on: ubuntu-latest
     needs: build-and-push
 
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v4
-
-      - name: Logar no Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Executar Docker Compose para deploy
+      - name: Simular Deploy para Cloud
         run: |
-          docker compose -f docker-compose.yml up -d --force-recreate
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
-          RABBITMQ_PASS: ${{ secrets.RABBITMQ_PASS }}
+          echo "Iniciando deploy simulado para a Cloud..."
+          echo "Imagens a serem deployadas:"
+          echo "- ${{ secrets.DOCKERHUB_USERNAME }}/payment-api:latest"
+          echo "- ${{ secrets.DOCKERHUB_USERNAME }}/receipt-api:latest"
+          echo "Aguardando 5 segundos para simular a comunicação com os serviços..."
+          sleep 5
+          echo "Deploy simulado concluído com sucesso."
