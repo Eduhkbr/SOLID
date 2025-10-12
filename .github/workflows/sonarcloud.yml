@@ -10,6 +10,10 @@ jobs:
   build-and-sonar-payments:
     name: Build, Test and SonarCloud (PaymentSolidApi)
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,15 +41,15 @@ jobs:
         run: mvn -B -V -DskipTests=false test jacoco:report
 
       - name: Sonar analysis PaymentSolidApi
-        if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_ORGANIZATION != '' && secrets.SONAR_PROJECT_KEY_PAYMENTS != '' }}
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY_PAYMENTS != '' }}
         working-directory: ./PaymentSolidApi
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
-          SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ env.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_PAYMENTS: ${{ env.SONAR_PROJECT_KEY_PAYMENTS }}
         run: |
           mvn -B sonar:sonar \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }} \
+            -Dsonar.login=${{ env.SONAR_TOKEN }} \
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY_PAYMENTS }} \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
