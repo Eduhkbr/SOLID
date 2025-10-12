@@ -1,0 +1,70 @@
+name: CI - Maven & SonarCloud
+
+on:
+  push:
+    branches: [ feat/lb ]
+  pull_request:
+    branches: [ feat/lb ]
+
+jobs:
+  build-and-sonar:
+    name: Build, Test and SonarCloud (per-module)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      # ------------------- PaymentSolidApi -------------------
+      - name: Build & test PaymentSolidApi (JaCoCo)
+        working-directory: ./PaymentSolidApi
+        env:
+          MAVEN_OPTS: -Xmx2g
+        run: mvn -B -V -DskipTests=false test jacoco:report
+
+      - name: Sonar analysis PaymentSolidApi
+        working-directory: ./PaymentSolidApi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      # ------------------- ReceiptApi -------------------
+      - name: Build & test ReceiptApi (JaCoCo)
+        working-directory: ./ReceiptApi
+        env:
+          MAVEN_OPTS: -Xmx2g
+        run: mvn -B -V -DskipTests=false test jacoco:report
+
+      - name: Sonar analysis ReceiptApi
+        working-directory: ./ReceiptApi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_RECEIPTS: ${{ secrets.SONAR_PROJECT_KEY_RECEIPTS }}
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_RECEIPTS }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml

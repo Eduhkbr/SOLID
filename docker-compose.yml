@@ -11,23 +11,43 @@ services:
   # =========================
   # Serviço de Banco de Dados PostgreSQL
   # =========================
-  postgres:
+  postgres-payments:
     image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
-    container_name: postgres_db  # Nome do container para fácil identificação
+    container_name: postgres_payments  # Nome do container para fácil identificação
     environment:
       POSTGRES_USER: ${POSTGRES_USER}  # Usuário do banco, definido em .env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Senha do banco, definido em .env
-      POSTGRES_DB: paymentdb  # Nome do banco de dados principal
+      POSTGRES_DB: ${POSTGRES_PAYMENTS_DB}  # Nome do banco de dados principal
     networks:
       - payment-db-network  # Rede para microsserviço de pagamentos
+    ports:
+      - "${POSTGRES_PAYMENTS_PORT}:5432"  # Expõe a porta padrão do PostgreSQL
+    volumes:
+      - pgdata_payments:/var/lib/postgresql/data  # Persistência dos dados do banco
+      - ./database/init-payments:/docker-entrypoint-initdb.d  # Scripts de inicialização do banco
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_PAYMENTS_DB}" ]  # Verifica se o banco está pronto
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres-receipts:
+    image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
+    container_name: postgres_receipts  # Nome do container para fácil identificação
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}  # Usuário do banco, definido em .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Senha do banco, definido em .env
+      POSTGRES_DB: ${POSTGRES_RECEIPTS_DB}  # Nome do banco de dados principal
+    networks:
       - receipt-db-network  # Rede para microsserviço de comprovantes
     ports:
-      - "5432:5432"  # Expõe a porta padrão do PostgreSQL
+      - "${POSTGRES_RECEIPTS_PORT}:5432"  # Expõe a porta padrão do PostgreSQL
     volumes:
-      - postgres_data:/var/lib/postgresql/data  # Persistência dos dados do banco
-      - ./database/init-scripts:/docker-entrypoint-initdb.d  # Scripts de inicialização do banco
+      - pgdata_receipts:/var/lib/postgresql/data  # Persistência dos dados do banco
+      - ./database/init-receipts:/docker-entrypoint-initdb.d  # Scripts de inicialização do banco
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d paymentdb" ]  # Verifica se o banco está pronto
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_RECEIPTS_DB}" ]  # Verifica se o banco está pronto
       interval: 30s
       timeout: 10s
       retries: 3
@@ -92,14 +112,14 @@ services:
     environment:
       - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_payment-api_1
       - SERVER_PORT=8082  # Porta interna do serviço
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb  # URL do banco
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payments:5432/${POSTGRES_PAYMENTS_DB}  # URL do banco
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
     depends_on:
-      postgres:
+      postgres-payments:
         condition: service_healthy  # Só inicia após o banco estar pronto
       rabbitmq:
         condition: service_healthy  # Só inicia após o RabbitMQ estar pronto
@@ -129,14 +149,14 @@ services:
     environment:
       - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_receipt-api_1
       - SERVER_PORT=8083
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-receipts:5432/${POSTGRES_RECEIPTS_DB}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
-      postgres:
+      postgres-receipts:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -150,18 +170,29 @@ services:
   # =========================
   # Exporter do PostgreSQL (para Prometheus)
   # =========================
-  postgres-exporter:
+  postgres-exporter-payments:
     image: quay.io/prometheuscommunity/postgres-exporter
-    container_name: postgres_exporter
+    container_name: postgres_exporter_payments
     environment:
-      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/paymentdb?sslmode=disable
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-payments:5432/${POSTGRES_PAYMENTS_DB}?sslmode=disable
     depends_on:
-      - postgres
+      - postgres-payments
     networks:
       - payment-db-network
+    ports:
+      - "${POSTGRES_EXPORTER_PAYMENTS_PORT}:9187"
+
+  postgres-exporter-receipts:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    container_name: postgres_exporter_receipts
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-receipts:5432/${POSTGRES_RECEIPTS_DB}?sslmode=disable
+    depends_on:
+      - postgres-receipts
+    networks:
       - receipt-db-network
     ports:
-      - "9187:9187"
+      - "${POSTGRES_EXPORTER_RECEIPTS_PORT}:9187"
 
   # =========================
   # Exporter do RabbitMQ (para Prometheus)
@@ -280,7 +311,8 @@ services:
 # Volumes para persistência de dados
 # =========================
 volumes:
-  postgres_data:  # Volume para dados do PostgreSQL
+  pgdata_payments:
+  pgdata_receipts:
   grafana_data:
   prometheus_data:  # Volume para dados do Prometheus
   loki_data:  # Volume para dados do Loki

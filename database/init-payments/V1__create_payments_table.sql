@@ -10,3 +10,4 @@ CREATE TABLE PAYMENTS (
 
 CREATE INDEX idx_payments_status ON payments(STATUS);
 CREATE INDEX idx_payments_email ON payments(EMAIL);
+

@@ -45,7 +45,7 @@ scrape_configs:
   - job_name: 'postgres-exporter'
     # Exporters geralmente expõem métricas em porta dedicada, compatível com Prometheus
     static_configs:
-      - targets: ['postgres-exporter:9187']
+      - targets: ['postgres-exporter-payments:9187', 'postgres-exporter-receipts:9187']
         labels:
           application: 'PostgreSQL Exporter'
 

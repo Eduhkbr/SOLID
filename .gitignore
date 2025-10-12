@@ -27,3 +27,6 @@ replay_pid*
 .idea/*
 
 .env
+
+# observability
+/prometheus/loki-data
