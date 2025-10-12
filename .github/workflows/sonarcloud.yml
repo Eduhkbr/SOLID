@@ -7,8 +7,8 @@ on:
     branches: [ feat/lb ]
 
 jobs:
-  build-and-sonar:
-    name: Build, Test and SonarCloud (per-module)
+  build-and-sonar-payments:
+    name: Build, Test and SonarCloud (PaymentSolidApi)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,7 +30,22 @@ jobs:
             ${{ runner.os }}-m2-
 
       # ------------------- PaymentSolidApi -------------------
-      - name: Build and analyze
+      - name: Build & test PaymentSolidApi (JaCoCo)
+        working-directory: ./PaymentSolidApi
+        env:
+          MAVEN_OPTS: -Xmx2g
+        run: mvn -B -V -DskipTests=false test jacoco:report
+
+      - name: Sonar analysis PaymentSolidApi
+        if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_ORGANIZATION != '' && secrets.SONAR_PROJECT_KEY_PAYMENTS != '' }}
+        working-directory: ./PaymentSolidApi
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
