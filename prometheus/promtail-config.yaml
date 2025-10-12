@@ -1,0 +1,86 @@
+# promtail-config.yaml
+# Configuração do Promtail: agente que coleta arquivos de log e envia ao Loki.
+
+# 'server' define porta HTTP onde Promtail expõe endpoints.
+server:
+  http_listen_port: 9080
+
+# 'positions' guarda em disco até qual linha dos arquivos o Promtail já leu.
+# Isso permite retomar a leitura após reinício sem reprocessar o arquivo inteiro.
+positions:
+  filename: /tmp/positions.yaml
+
+# 'clients' define para qual endpoint do Loki o Promtail deve enviar os logs.
+# Em um ambiente com vários nós, a URL frequentemente aponta para o serviço Loki.
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+# 'scrape_configs' define quais arquivos de log o Promtail deve ler.
+# Cada job pode usar 'static_configs' com o label '__path__' definindo o(s)
+# caminho(s) de arquivo no sistema de arquivos.
+scrape_configs:
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          # 'job' é um label arbitrário que ajuda a identificar a origem do log
+          job: varlogs
+          # Labels adicionais úteis para filtrar no Grafana/Loki. Substitua
+          # os valores abaixo conforme seu ambiente (por ex. 'prod', 'staging').
+          application: system
+          environment: dev
+          host: localhost
+          # '__path__' informa onde procurar os arquivos. Suporta wildcards.
+          __path__: /var/log/*log
+
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          # Labels para facilitar busca por host/ambiente/aplicacao.
+          # Em ambientes reais com metadata do Docker, prefira usar
+          # 'docker_sd_configs' + 'relabel_configs' para extrair container_name
+          # e container_id automaticamente.
+          application: docker-host
+          environment: dev
+          host: localhost
+          # Em sistemas Docker, logs dos containers ficam em /var/lib/docker/containers
+          __path__: /var/lib/docker/containers/*/*.log
+
+  # =========================
+  # Docker service discovery
+  # =========================
+  # Este job usa o Docker daemon (socket) para descobrir containers e
+  # popular labels dinâmicos como 'container_id' e 'container_name'. É útil
+  # quando há muitos containers e/ou os nomes mudam frequentemente. Para que
+  # funcione, o Promtail precisa ter acesso ao socket do Docker
+  # (ex.: bind-mount /var/run/docker.sock no container do Promtail).
+  - job_name: docker_sd
+    # Descobre containers através do Docker daemon local
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    # Mapear metadados detectados para labels que serão usados no Loki
+    relabel_configs:
+      # Extrai o ID do container para um label 'container_id'
+      - source_labels: [__meta_docker_container_id]
+        target_label: container_id
+      # Extrai o nome do container (ex: /my-container) para 'container_name'
+      # e remove a barra inicial (/) usando regex para que o label fique limpo.
+      - source_labels: [__meta_docker_container_name]
+        regex: ^/(.+)$
+        target_label: container_name
+        replacement: $1
+      # Define o caminho do arquivo de log a partir do container_id (formato padrão do Docker)
+      - source_labels: [__meta_docker_container_id]
+        regex: (.+)
+        target_label: __path__
+        replacement: /var/lib/docker/containers/${1}/${1}-json.log
+
+# Dicas práticas:
+# - Em Kubernetes, use a integração específica (DaemonSet) em vez de caminhos
+#   estáticos. Em contêineres locais, ajuste __path__ conforme o layout do host.
+# - O arquivo de 'positions' deve estar em volume persistente se você quiser
+#   que o Promtail memorize a posição entre reinícios do container.

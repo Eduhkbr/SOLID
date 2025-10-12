@@ -1,150 +1,133 @@
-# Versão do Docker Compose
-# 3.8 é uma versão moderna com suporte a recursos avançados
-# version foi usado na época do Compose v1, hoje é obsoleto
-version: '3.8'
+# =========================
+# Arquivo docker-compose.yml
+#
+# Este arquivo orquestra múltiplos serviços para um sistema de pagamentos e comprovantes,
+# utilizando PostgreSQL, RabbitMQ, Nginx (load balancer) e dois microsserviços Java Spring Boot.
+# =========================
 
-# Definição de serviços que compõem a arquitetura da aplicação
+version: '3.8'  # Versão moderna do Docker Compose
+
 services:
-
+  # =========================
   # Serviço de Banco de Dados PostgreSQL
+  # =========================
   postgres:
-    # Imagem oficial do PostgreSQL versão 17
-    image: postgres:17
-
-    # Nome personalizado do contêiner para fácil identificação
-    container_name: postgres_db
-
-    # Configurações de ambiente para inicialização do banco
+    image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
+    container_name: postgres_db  # Nome do container para fácil identificação
     environment:
-      # Credenciais de acesso (para ambiente de desenvolvimento)
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Nome do banco de dados inicial
-      POSTGRES_DB: paymentdb
-
+      POSTGRES_USER: ${POSTGRES_USER}  # Usuário do banco, definido em .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Senha do banco, definido em .env
+      POSTGRES_DB: paymentdb  # Nome do banco de dados principal
     networks:
-      # PostgreSQL tem suas próprias redes isoladas para cada microserviço
-      - payment-db-network
-      - receipt-db-network
-
-    # Mapeamento de portas: host:contêiner
+      - payment-db-network  # Rede para microsserviço de pagamentos
+      - receipt-db-network  # Rede para microsserviço de comprovantes
     ports:
-      - "5432:5432"
-
-    # Volume para persistência de dados
-    # Garante que os dados sejam mantidos mesmo após reiniciar o contêiner
+      - "5432:5432"  # Expõe a porta padrão do PostgreSQL
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init-scripts:/docker-entrypoint-initdb.d
-
+      - postgres_data:/var/lib/postgresql/data  # Persistência dos dados do banco
+      - ./database/init-scripts:/docker-entrypoint-initdb.d  # Scripts de inicialização do banco
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d paymentdb" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d paymentdb" ]  # Verifica se o banco está pronto
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
+  # =========================
   # Serviço de Mensageria RabbitMQ
+  # =========================
   rabbitmq:
-    # Imagem do RabbitMQ com interface de gerenciamento
-    image: rabbitmq:4.1-management
-
+    image: rabbitmq:4.1-management  # Imagem do RabbitMQ com interface de gerenciamento
     container_name: rabbitmq_broker
-
     networks:
-      # RabbitMQ tem suas próprias redes isoladas para cada serviço
+      - payment-mq-network  # Rede para microsserviço de pagamentos
+      - receipt-mq-network  # Rede para microsserviço de comprovantes
+    ports:
+      - "5672:5672"    # Porta padrão do RabbitMQ
+      - "15672:15672"  # Porta do painel de administração
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}  # Usuário padrão, definido em .env
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}  # Senha padrão, definido em .env
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]  # Verifica se o RabbitMQ está pronto
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =========================
+  # Load Balancer (Nginx)
+  # =========================
+  nginx-lb:
+    image: nginx:latest  # Imagem oficial do Nginx
+    container_name: nginx_load_balancer
+    ports:
+      - "80:80"  # Porta de entrada HTTP para o sistema
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro  # Monta o arquivo de configuração do Nginx
+    networks:
       - payment-mq-network
       - receipt-mq-network
+    depends_on:
+      - payment-api  # Garante que os microsserviços estejam prontos antes do Nginx
+      - receipt-api
 
-    # Exposição de portas:
-    # 5672 - Porta padrão para aplicações
-    # 15672 - Interface web de gerenciamento
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-
-    # Credenciais padrão
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
-
-    healthcheck:
-        test: ["CMD", "rabbitmq-diagnostics", "status"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 40s
-
+  # =========================
   # Microsserviço de Pagamentos
+  # =========================
   payment-api:
-
-    # Imagem Docker personalizada (comentada para usar build local)
-    #image: eduhkbr/payment-api:0.0.1
-
-    # Build a partir de Dockerfile específico
+    # build local a partir do Dockerfile do projeto
     build:
-      # Contexto do build (caminho para a pasta do projeto)
-      context: ./PaymentSolidApi
-      # Dockerfile específico para este serviço
-      dockerfile: Dockerfile
-
-    container_name: payment_api_service
-
-    # Mapeamento de porta para acesso externo
-    ports:
-      - "8082:8082"
-
+      context: ./PaymentSolidApi  # Diretório do projeto Java
+      dockerfile: Dockerfile      # Dockerfile a ser usado
+    deploy:
+      replicas: 2 # Cria 2 instâncias para balanceamento de carga
+      resources:
+        limits:
+          cpus: '0.2'   # Limita a 0.2 CPU
+          memory: 512M   # Limita a 512MB de RAM
     networks:
-      # Payment API só acessa suas redes específicas
       - payment-db-network  # Acesso ao PostgreSQL
       - payment-mq-network  # Acesso ao RabbitMQ
-
-    # Variáveis de ambiente para configuração
     environment:
-      # Configurações de porta e conexão
-      - SERVER_PORT=8082
-      # Conexão com PostgreSQL usando nome do serviço
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
-      # As próximas variáveis são lidas de variáveis de ambiente do SO
+      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_payment-api_1
+      - SERVER_PORT=8082  # Porta interna do serviço
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb  # URL do banco
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      # Credenciais do RabbitMQ
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
-
-    # Dependências: garante que PostgreSQL e RabbitMQ iniciem antes
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_healthy  # Só inicia após o banco estar pronto
       rabbitmq:
-        condition: service_healthy
-
+        condition: service_healthy  # Só inicia após o RabbitMQ estar pronto
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]  # Verifica saúde do serviço
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 90s
 
+  # =========================
   # Microsserviço de Comprovantes
+  # =========================
   receipt-api:
-    # Configuração similar ao payment-api
     build:
       context: ./ReceiptApi
       dockerfile: Dockerfile
-
-    container_name: receipt_api_service
-
-    ports:
-      - "8083:8083"
-
+    deploy:
+      replicas: 2 # Cria 2 instâncias para balanceamento de carga
+      resources:
+        limits:
+          cpus: '0.2'   # Limita a 0.2 CPU
+          memory: 512M   # Limita a 512MB de RAM
     networks:
-      # Receipt API só acessa suas redes específicas
       - receipt-db-network  # Acesso ao PostgreSQL
       - receipt-mq-network  # Acesso ao RabbitMQ
-
     environment:
+      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_receipt-api_1
       - SERVER_PORT=8083
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/paymentdb
       - SPRING_RABBITMQ_HOST=rabbitmq
@@ -152,13 +135,11 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1" ]
       interval: 30s
@@ -166,28 +147,157 @@ services:
       retries: 3
       start_period: 90s
 
-# Definição de volumes para persistência de dados
-volumes:
-  # Volume nomeado para dados do PostgreSQL
-  postgres_data:
+  # =========================
+  # Exporter do PostgreSQL (para Prometheus)
+  # =========================
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    container_name: postgres_exporter
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/paymentdb?sslmode=disable
+    depends_on:
+      - postgres
+    networks:
+      - payment-db-network
+      - receipt-db-network
+    ports:
+      - "9187:9187"
 
-# Definição de redes para comunicação entre contêineres
-# Redes isoladas para cada combinação serviço-recurso
-# Os dois microserviços não compartilham redes diretamente
-# O MQ e o DB não se comunicam entre si
+  # =========================
+  # Exporter do RabbitMQ (para Prometheus)
+  # =========================
+  rabbitmq-exporter:
+    image: kbudde/rabbitmq-exporter
+    container_name: rabbitmq_exporter
+    environment:
+      - RABBIT_URL=http://rabbitmq:15672
+      - RABBIT_USER=${RABBITMQ_USER}
+      - RABBIT_PASSWORD=${RABBITMQ_PASS}
+    depends_on:
+      - rabbitmq
+    networks:
+      - payment-mq-network
+      - receipt-mq-network
+    ports:
+      - "9419:9419"
+
+  # =========================
+  # Prometheus (Coleta de Métricas)
+  # =========================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus  # Volume dedicado para persistência dos dados do Prometheus
+    networks:
+      - payment-db-network
+      - receipt-db-network
+      - payment-mq-network
+      - receipt-mq-network
+
+  # =========================
+  # Grafana
+  # =========================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - payment-db-network
+      - receipt-db-network
+      - payment-mq-network
+      - receipt-mq-network
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  # =========================
+  # Alertmanager (Gerenciamento de Alertas)
+  # =========================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"  # Interface web do Alertmanager
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    networks:
+      - payment-db-network
+      - receipt-db-network
+      - payment-mq-network
+      - receipt-mq-network
+
+  # =========================
+  # Loki (Centralização de Logs)
+  # =========================
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    ports:
+      - "3100:3100"  # Porta padrão da API do Loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./prometheus/loki-data/chunks:/loki/chunks
+      - ./prometheus/loki-data/index:/loki/index
+      - ./prometheus/loki-data/boltdb-cache:/loki/boltdb-cache
+      - ./prometheus/loki-data/compactor:/loki/compactor
+      - ./prometheus/loki-data/wal:/wal
+      - ./prometheus/loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - payment-db-network
+      - receipt-db-network
+      - payment-mq-network
+      - receipt-mq-network
+
+  # =========================
+  # Promtail (Coletor de Logs para o Loki)
+  # =========================
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./prometheus/promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - payment-db-network
+      - receipt-db-network
+      - payment-mq-network
+      - receipt-mq-network
+    depends_on:
+      - loki
+
+# =========================
+# Volumes para persistência de dados
+# =========================
+volumes:
+  postgres_data:  # Volume para dados do PostgreSQL
+  grafana_data:
+  prometheus_data:  # Volume para dados do Prometheus
+  loki_data:  # Volume para dados do Loki
+
+# =========================
+# Redes customizadas para isolar e conectar serviços
+# =========================
 networks:
-  # Redes para Payment API - para comunicação com RabbitMQ e com banco de dados
   payment-db-network:
     driver: bridge
-    name: payment_database_network
+    name: payment_database_network  # Rede para comunicação entre payment-api e banco
   payment-mq-network:
     driver: bridge
-    name: payment_messaging_network
-
-  # Redes para Receipt API - para comunicação com RabbitMQ e com banco de dados
+    name: payment_messaging_network  # Rede para comunicação entre payment-api e RabbitMQ
   receipt-db-network:
     driver: bridge
-    name: receipt_database_network
+    name: receipt_database_network  # Rede para comunicação entre receipt-api e banco
   receipt-mq-network:
     driver: bridge
-    name: receipt_messaging_network
+    name: receipt_messaging_network  # Rede para comunicação entre receipt-api e RabbitMQ

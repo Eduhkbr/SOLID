@@ -1,0 +1,23 @@
+# alertmanager.yml
+# Arquivo de configuração do Alertmanager.
+# O Alertmanager recebe alertas do Prometheus e roteia/enfileira/agrupa/alerta-os
+# para canais (e.g. e-mail, Slack, PagerDuty). Este é um exemplo mínimo para
+# desenvolvimento/local — em produção normalmente você terá rotas, inibidores,
+# receptores com webhooks e templates de mensagem.
+
+# 'route' define o caminho padrão para roteamento de alertas. Aqui, todos os
+# alertas vão para o receiver 'default'. Em producao você pode criar rotas
+# filtrando por labels (e.g. severity) para enviar a canais diferentes.
+route:
+  receiver: 'default'
+
+# 'receivers' descreve como notificar o destino. No exemplo abaixo o receiver
+# 'default' não faz notificações externas — apenas existe para a interface web
+# e para permitir testes. Para notificações reais, adicione campos como
+# 'email_configs', 'slack_configs' ou 'webhook_configs'.
+receivers:
+  - name: 'default'
+
+# Observações rápidas:
+# - consulte a documentação do Alertmanager para exemplos de configuração mais
+#   avançados: https://prometheus.io/docs/alerting/latest/alertmanager/

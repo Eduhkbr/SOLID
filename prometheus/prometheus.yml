@@ -1,0 +1,65 @@
+# prometheus.yml
+# Arquivo principal de configuração do Prometheus.
+
+global:
+  # Intervalo padrão para extração (scrape) de métricas. Ajuste para reduzir
+  # latência (valor menor) ou reduzir uso de rede/CPU (valor maior).
+  # Ex.: 15s (coleta a cada 15 segundos)
+  scrape_interval: 15s
+
+# Configuração de envio de alertas para o Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# scrape_configs define os 'jobs' que o Prometheus consulta para coletar métricas.
+# Cada job tem: job_name, metrics_path (endereço no serviço que expõe métricas)
+# e static_configs/targets (hosts e portas) ou service discovery.
+scrape_configs:
+  # =========================
+  # Microsserviço de Pagamentos
+  # =========================
+  - job_name: 'payment-api'
+    # Caminho onde o Spring Boot Actuator expõe as métricas no formato Prometheus
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['payment-api:8082']
+        labels:
+          # Labels ajudam a identificar o target nas métricas e regras.
+          application: 'Spring Boot Application Payment'
+
+  # =========================
+  # Microsserviço de Comprovantes
+  # =========================
+  - job_name: 'receipt-api'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['receipt-api:8083']
+        labels:
+          application: 'Spring Boot Application Receipt'
+
+  # =========================
+  # Exporter do PostgreSQL
+  # =========================
+  - job_name: 'postgres-exporter'
+    # Exporters geralmente expõem métricas em porta dedicada, compatível com Prometheus
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          application: 'PostgreSQL Exporter'
+
+  # =========================
+  # Exporter do RabbitMQ
+  # =========================
+  - job_name: 'rabbitmq-exporter'
+    static_configs:
+      - targets: ['rabbitmq-exporter:9419']
+        labels:
+          application: 'RabbitMQ Exporter'
+
+# rule_files indica onde o Prometheus deve carregar arquivos adicionais de regras
+# (os arquivos que definem os Alerts). No container/pacote de produção o caminho
+# costuma ser /etc/prometheus/alert.rules.yml ou similar.
+rule_files:
+  - /etc/prometheus/alert.rules.yml

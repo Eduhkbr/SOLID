@@ -1,0 +1,81 @@
+# loki-config.yaml
+# Configuração do Loki (armazenamento de logs). Este arquivo explica as
+# seções principais: autenticação, servidor, ingester, compactor, esquema,
+# armazenamento e limites.
+
+# Se true, exige autenticação para endpoints do Loki
+auth_enabled: false
+
+server:
+  # Porta HTTP usada pelo Loki para consultas e ingestão
+  http_listen_port: 3100
+  # Porta gRPC usada por componentes internos (ingester/querier)
+  grpc_listen_port: 9096
+
+# 'ingester' controla como os ingesters mantêm e replicam os chunks na memória
+# obs: chunk (ingest → flush → armazenamento → indexação → retenção).
+# Em vez de gravar cada linha individualmente num banco de dados indexado, o Loki acumula logs em memória (ou no WAL),
+#  organiza-os por rótulos (labels) e depois grava estes blocos (chunks) no armazenamento (filesystem ou object store).
+#  Cada chunk contém muitas linhas de log para um mesmo conjunto de labels e um intervalo de tempo.
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        # Em ambientes simples/perfil local usamos 'inmemory'.
+        store: inmemory
+      replication_factor: 1
+  # Período que um chunk fica ocioso antes de ser considerado elegível para
+  # flush/arquivo
+  chunk_idle_period: 5m
+  # Tempo que o chunk é retido antes de ser liberado/repassado
+  chunk_retain_period: 30s
+  max_transfer_retries: 0
+
+compactor:
+  # Diretório de trabalho onde o compactor pode escrever dados temporários
+  working_directory: /loki/compactor
+  # Em 'shared_store: filesystem' os nós compartilham os arquivos via volume
+  shared_store: filesystem
+  compaction_interval: 10m
+  # Habilita exclusão por retenção
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+schema_config:
+  # Configura o esquema de indexação/particionamento de chunks
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  # Configuração para o boltdb-shipper (index) + filesystem (chunks)
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/boltdb-cache
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks
+
+limits_config:
+  # Se 'enforce_metric_name' for true o Loki exige nomes de métrica válidos
+  enforce_metric_name: false
+  # Rejeita amostras com timestamp muito antigo (útil para evitar ingestão
+  # retroativa massiva que poderia poluir o armazenamento)
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+chunk_store_config:
+  # Quanto tempo o querier pode procurar chunks antigos (0s para desabilitar)
+  max_look_back_period: 0s
+
+# Observações e dicas:
+# - Em produção, prefira usar um object store compartilhado (S3, GCS) para o
+#   boltdb-shipper e não 'filesystem'.
+# - Ajuste 'retention' e 'compaction_interval' conforme o volume de logs e as
+#   necessidades de retenção de dados.

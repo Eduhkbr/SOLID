@@ -1,0 +1,141 @@
+# alert.rules.yml
+# Arquivo de regras de alerta do Prometheus.
+# Cada grupo contém regras que avaliam expressões PromQL e disparam alertas quando verdadeiras.
+# Estrutura de uma regra:
+# - alert: <NomeDoAlerta>    -> Identificador curto do alerta
+#   expr: <PromQL>            -> Expressão PromQL que retorna série(s) com valor(s) que acionam o alerta
+#   for: <duração>           -> Período que a expressão precisa ficar verdadeira para disparar o alerta
+#   labels:                   -> Rótulos usados para roteamento/gravidade no Alertmanager
+#   annotations:              -> Metadados (summary, description) usados em notificações
+
+groups:
+  - name: alertas_essenciais
+    rules:
+      # Alertas para payment-api
+      - alert: ServicoIndisponivel
+        # Avalia se a métrica 'up' para o job payment-api está em 0 (indisponível)
+        expr: up{job="payment-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instância do payment-api indisponível"
+          description: "O serviço payment-api está fora do ar há mais de 1 minuto."
+
+      - alert: PoolConexoesExaurido
+        # Usa métricas do HikariCP para detectar quando o pool está muito utilizado
+        expr: hikari_connections_active{job="payment-api"} / hikari_connections_max{job="payment-api"} > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool de conexões quase esgotado"
+          description: "Mais de 10% das conexões do pool estão em uso."
+
+      - alert: ErroHttpElevado
+        expr: rate(http_server_requests_seconds_count{job="payment-api",status=~"5.."}[1m]) > 0.50
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa de erro HTTP 5xx elevada"
+          description: "Mais de 50% das requisições estão retornando erro 5xx."
+
+      - alert: UsoCpuElevado
+        expr: process_cpu_usage{job="payment-api"} > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de CPU elevado"
+          description: "O uso de CPU está acima de 10% por mais de 1 minutos."
+
+      - alert: UsoMemoriaElevado
+        # Proporção usada/max da heap JVM
+        expr: jvm_memory_used_bytes{area="heap",job="payment-api"} / jvm_memory_max_bytes{area="heap",job="payment-api"} > 0.10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de memória heap elevado"
+          description: "Mais de 10% da heap JVM está em uso."
+
+      - alert: RabbitMQFilaGrande
+        # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens
+        expr: rabbitmq_queue_messages{queue=~".*"} > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fila RabbitMQ com mais de 5 mensagens"
+          description: "A fila RabbitMQ '{{ $labels.queue }}' está acumulando mensagens."
+
+      - alert: BancoConexaoLenta
+        # Exemplo genérico: detectar aumento na taxa de conexões ativas (ajuste conforme exporter)
+        expr: rate(jdbc_connections_active{job="payment-api"}[1m]) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Muitas conexões lentas ao banco de dados"
+          description: "O número de conexões lentas ao banco está acima do normal."
+
+      # Alertas para receipt-api
+      - alert: ServicoIndisponivelReceipt
+        # Avalia se a métrica 'up' para o job receipt-api está em 0 (indisponível)
+        expr: up{job="receipt-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instância do receipt-api indisponível"
+          description: "O serviço receipt-api está fora do ar há mais de 1 minuto."
+
+      - alert: PoolConexoesExauridoReceipt
+        # Usa métricas do HikariCP para detectar quando o pool do receipt-api está muito utilizado
+        expr: hikari_connections_active{job="receipt-api"} / hikari_connections_max{job="receipt-api"} > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool de conexões quase esgotado (receipt-api)"
+          description: "Mais de 10% das conexões do pool do receipt-api estão em uso."
+
+      - alert: ErroHttpElevadoReceipt
+        expr: rate(http_server_requests_seconds_count{job="receipt-api",status=~"5.."}[1m]) > 0.50
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa de erro HTTP 5xx elevada (receipt-api)"
+          description: "Mais de 50% das requisições do receipt-api estão retornando erro 5xx."
+
+      - alert: UsoCpuElevadoReceipt
+        # Uso de CPU do processo do receipt-api acima do limiar
+        expr: process_cpu_usage{job="receipt-api"} > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de CPU elevado (receipt-api)"
+          description: "O uso de CPU do receipt-api está acima de 10% por mais de 1 minuto."
+
+      - alert: UsoMemoriaElevadoReceipt
+        # Proporção usada/max da heap JVM do receipt-api
+        expr: jvm_memory_used_bytes{area="heap",job="receipt-api"} / jvm_memory_max_bytes{area="heap",job="receipt-api"} > 0.10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de memória heap elevado (receipt-api)"
+          description: "Mais de 10% da heap JVM do receipt-api está em uso."
+
+      - alert: BancoConexaoLentaReceipt
+        # Exemplo genérico para receipt-api: detectar aumento na taxa de conexões ativas lentas
+        expr: rate(jdbc_connections_active{job="receipt-api"}[1m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Muitas conexões lentas ao banco de dados (receipt-api)"
+          description: "O número de conexões lentas ao banco do receipt-api está acima do normal."
