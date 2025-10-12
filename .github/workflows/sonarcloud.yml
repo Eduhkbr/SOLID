@@ -30,41 +30,7 @@ jobs:
             ${{ runner.os }}-m2-
 
       # ------------------- PaymentSolidApi -------------------
-      - name: Build & test PaymentSolidApi (JaCoCo)
-        working-directory: ./PaymentSolidApi
-        env:
-          MAVEN_OPTS: -Xmx2g
-        run: mvn -B -V -DskipTests=false test jacoco:report
-
-      - name: Sonar analysis PaymentSolidApi
-        working-directory: ./PaymentSolidApi
+      - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
-          SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
-        run: |
-          mvn -B sonar:sonar \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }} \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-
-      # ------------------- ReceiptApi -------------------
-      - name: Build & test ReceiptApi (JaCoCo)
-        working-directory: ./ReceiptApi
-        env:
-          MAVEN_OPTS: -Xmx2g
-        run: mvn -B -V -DskipTests=false test jacoco:report
-
-      - name: Sonar analysis ReceiptApi
-        working-directory: ./ReceiptApi
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
-          SONAR_PROJECT_KEY_RECEIPTS: ${{ secrets.SONAR_PROJECT_KEY_RECEIPTS }}
-        run: |
-          mvn -B sonar:sonar \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_RECEIPTS }} \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID
