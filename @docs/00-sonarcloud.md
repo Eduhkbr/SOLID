@@ -45,3 +45,4 @@ mvn clean verify sonar:sonar -Dsonar.login=SEU_TOKEN
 - [Documentação SonarCloud](https://sonarcloud.io/documentation)
 - [Plugin Maven Sonar](https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-maven/)
 
+

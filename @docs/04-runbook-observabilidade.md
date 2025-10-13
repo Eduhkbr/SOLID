@@ -44,7 +44,3 @@
 
 - Revise dashboards e alertas dos serviços **PaymentSolidApi** e **ReceiptApi** para identificar possíveis melhorias.
 - Atualize o runbook conforme necessário.
-
----
-
-*Atualizado em: 13/10/2025*
