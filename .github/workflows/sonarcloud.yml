@@ -37,4 +37,4 @@ jobs:
         working-directory: ./PaymentSolidApi
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco/jacoco.xml
