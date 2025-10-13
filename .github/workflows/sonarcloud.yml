@@ -1,55 +1,40 @@
-name: CI - Maven & SonarCloud
+name: SonarQube
 
 on:
   push:
-    branches: [ feat/lb ]
+    branches:
+      - feat/lb
   pull_request:
-    branches: [ feat/lb ]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 jobs:
-  build-and-sonar-payments:
-    name: Build, Test and SonarCloud (PaymentSolidApi)
+  build:
+    name: Build and analyze
     runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
-      SONAR_PROJECT_KEY_PAYMENTS: ${{ secrets.SONAR_PROJECT_KEY_PAYMENTS }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 21
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Cache Maven local repository
+          java-version: 21
+          distribution: 'temurin'
+      - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:
-          path: ~/.m2/repository
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      # ------------------- PaymentSolidApi -------------------
-      - name: Build & test PaymentSolidApi (JaCoCo)
+          restore-keys: ${{ runner.os }}-m2
+      - name: Build and analyze PaymentSolidApi
         working-directory: ./PaymentSolidApi
         env:
-          MAVEN_OPTS: -Xmx2g
-        run: mvn -B -V -DskipTests=false test jacoco:report
-
-      - name: Sonar analysis PaymentSolidApi
-        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY_PAYMENTS != '' }}
-        working-directory: ./PaymentSolidApi
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          SONAR_ORGANIZATION: ${{ env.SONAR_ORGANIZATION }}
-          SONAR_PROJECT_KEY_PAYMENTS: ${{ env.SONAR_PROJECT_KEY_PAYMENTS }}
-        run: |
-          mvn -B sonar:sonar \
-            -Dsonar.login=${{ env.SONAR_TOKEN }} \
-            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} \
-            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY_PAYMENTS }} \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID
