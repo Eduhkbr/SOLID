@@ -119,6 +119,18 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- OpenTelemetry: Instrumentação automática e exportação OTLP para Tempo -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-spring-boot-starter</artifactId>
+            <version>1.22.1-alpha</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <version>1.38.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>

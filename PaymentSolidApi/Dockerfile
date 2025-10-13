@@ -38,6 +38,12 @@ ARG JAR_FILE=target/*.jar
 # Copia o .jar gerado no STAGE 1 para a imagem final.
 COPY --from=build /app/${JAR_FILE} app.jar
 
+# Copia o OpenTelemetry Java Agent para a imagem (certifique-se de baixar o .jar para o diretório do Dockerfile)
+COPY opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
+
+# Configura a variável de ambiente para ativar o agent
+ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
+
 # Define a propriedade do diretório e do arquivo para o novo usuário.
 # Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
 RUN chown -R appuser:appgroup /app

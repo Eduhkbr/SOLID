@@ -118,6 +118,8 @@ services:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
     depends_on:
       postgres-payments:
         condition: service_healthy  # Só inicia após o banco estar pronto
@@ -306,6 +308,23 @@ services:
       - receipt-mq-network
     depends_on:
       - loki
+
+  # =========================
+  # Serviço de Tracing Tempo
+  # =========================
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./prometheus/loki-data:/tmp/tempo
+      - ./prometheus/tempo-config.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"   # HTTP API (usada pelo Grafana)
+      - "4317:4317"   # OTLP gRPC (recebe traces das aplicações)
+    networks:
+      - payment-mq-network
+      - receipt-mq-network
 
 # =========================
 # Volumes para persistência de dados
