@@ -33,8 +33,13 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze PaymentSolidApi
+      - name: Build and test PaymentSolidApi
+        working-directory: ./PaymentSolidApi
+        env:
+          MAVEN_OPTS: -Xmx2g
+        run: mvn -B clean verify
+      - name: SonarCloud analysis PaymentSolidApi
         working-directory: ./PaymentSolidApi
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco/jacoco.xml
+        run: mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Eduhkbr_SOLID -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco/jacoco.xml
