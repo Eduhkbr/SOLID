@@ -19,9 +19,8 @@ storage:
 
 compactor:
   compaction:
-    block_retention: 48h
+    block_retention: 10m
 
 querier:
   frontend_worker:
     frontend_address: 127.0.0.1:9095
-

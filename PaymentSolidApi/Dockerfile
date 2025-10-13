@@ -25,6 +25,11 @@ RUN mvn clean install -DskipTests
 # Isso torna a imagem final muito menor e mais segura removendo ferramentas de build
 FROM eclipse-temurin:21-jre-jammy
 
+# Instala ferramentas mínimas necessárias para healthchecks (curl) e certificados
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Cria um grupo e um usuário de sistema dedicados para a aplicação.
 # --system cria um usuário sem home directory
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser

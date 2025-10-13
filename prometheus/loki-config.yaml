@@ -39,7 +39,7 @@ compactor:
   compaction_interval: 10m
   # Habilita exclusão por retenção
   retention_enabled: true
-  retention_delete_delay: 2h
+  retention_delete_delay: 10m
   retention_delete_worker_count: 150
 
 schema_config:
@@ -68,7 +68,7 @@ limits_config:
   # Rejeita amostras com timestamp muito antigo (útil para evitar ingestão
   # retroativa massiva que poderia poluir o armazenamento)
   reject_old_samples: true
-  reject_old_samples_max_age: 168h
+  reject_old_samples_max_age: 1h
 
 chunk_store_config:
   # Quanto tempo o querier pode procurar chunks antigos (0s para desabilitar)
