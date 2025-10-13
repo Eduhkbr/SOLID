@@ -14,9 +14,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api")
 public class PaymentController implements PaymentsApi {
+
+    private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
 
     private final PaymentService paymentService;
 
@@ -31,7 +36,7 @@ public class PaymentController implements PaymentsApi {
 
     @Override
     public ResponseEntity<PaymentResponseDTO> createPayment(@RequestBody PaymentRequestDTO request) {
-        System.out.println("LOG: Requisição 'createPayment' recebida pela instância: " + instanceId);
+        logger.info("Requisição 'createPayment' recebida pela instância: {}", instanceId);
 
         final var createdPayment = paymentService.create(PaymentMapper.fromRequestDto(request));
         final var uri = URI.create("/api/payments/" + createdPayment.getId());
@@ -41,7 +46,7 @@ public class PaymentController implements PaymentsApi {
 
     @Override
     public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable("id") UUID id) {
-        System.out.println("LOG: Requisição 'findPaymentById' para o ID " + id + " recebida pela instância: " + instanceId);
+        logger.info("Requisição 'findPaymentById' para o ID {} recebida pela instância: {}", id, instanceId);
 
         var paymentOpt = paymentService.findById(id);
         return paymentOpt.map(payment ->
@@ -51,7 +56,7 @@ public class PaymentController implements PaymentsApi {
 
     @Override
     public ResponseEntity<PaymentResponseDTO> refundPayment(@PathVariable("id") UUID id) {
-        System.out.println("LOG: Requisição 'refundPayment' para o ID " + id + " recebida pela instância: " + instanceId);
+        logger.info("Requisição 'refundPayment' para o ID {} recebida pela instância: {}", id, instanceId);
 
         final var paymentRefunded = paymentService.refundPayment(id);
         return ResponseEntity.ok().body(PaymentMapper.toResponseDto(paymentRefunded));
