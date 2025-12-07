@@ -25,6 +25,11 @@ RUN mvn clean install -DskipTests
 # Isso torna a imagem final muito menor e mais segura removendo ferramentas de build
 FROM eclipse-temurin:21-jre-jammy
 
+# Instala o curl para permitir que o healthcheck do contêiner acesse os endpoints do actuator.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Cria um grupo e um usuário de sistema dedicados para a aplicação.
 # --system cria um usuário sem home directory
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
