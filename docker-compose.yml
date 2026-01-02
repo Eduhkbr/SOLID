@@ -1,8 +1,3 @@
-# Versão do Docker Compose
-# 3.8 é uma versão moderna com suporte a recursos avançados
-# version foi usado na época do Compose v1, hoje é obsoleto
-version: '3.8'
-
 # Definição de serviços que compõem a arquitetura da aplicação
 services:
 
@@ -36,11 +31,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init-scripts:/docker-entrypoint-initdb.d
+    # Define como o Docker vai verificar se o container está saudável/up (healthy) ou não
     healthcheck:
+      # indica que o comando será executado dentro de um shell
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d paymentdb"]
       interval: 15s
       timeout: 5s
       retries: 5
+      # Dá um tempo de 20 segundos após o container iniciar antes de começar a checar.
       start_period: 20s
 
   # Serviço de Mensageria RabbitMQ
