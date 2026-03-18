@@ -126,6 +126,7 @@ services:
     build:
       context: ./ReceiptApi
       dockerfile: Dockerfile
+#      dockerfile: Dockerfile_no_stage
 
     container_name: receipt_api_service
 
