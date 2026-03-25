@@ -9,14 +9,14 @@ servers:
     description: Servidor de Desenvolvimento
 
 tags:
-  - name: Pagamentos
+  - name: Payments
     description: Operações relacionadas ao processamento de pagamentos
 
 paths:
   /payments:
     post:
       tags:
-        - Pagamentos
+        - Payments
       summary: Criar Novo Pagamento
       description: Processa um novo pagamento no sistema
       operationId: createPayment
@@ -49,10 +49,9 @@ paths:
         '201':
           description: Pagamento criado com sucesso
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: "Pagamento processado com sucesso! ID: a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                $ref: '#/components/schemas/PaymentResponseDTO'
         '400':
           description: Dados de pagamento inválidos
           content:
@@ -84,7 +83,7 @@ paths:
   /payments/{id}:
     get:
       tags:
-        - Pagamentos
+        - Payments
       summary: Buscar um Pagamento
       description: Busca um pagamento no sistema pelo ID
       operationId: findPaymentById
@@ -125,7 +124,7 @@ paths:
   /payments/receipt/{id}:
     get:
       tags:
-        - Pagamentos
+        - Payments
       summary: Buscar um Comprovante de pagamento
       description: Busca um comprovante de pagamento no sistema pelo ID do pagamento
       operationId: findReceiptById
@@ -166,7 +165,7 @@ paths:
   /payments/refund/{id}:
     post:
       tags:
-        - Pagamentos
+        - Payments
       summary: Estornar Pagamento
       description: |
         Realiza o estorno de um pagamento. 
@@ -188,10 +187,9 @@ paths:
         '200':
           description: Pagamento estornado com sucesso
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: "Pagamento estornado com sucesso."
+                $ref: '#/components/schemas/PaymentResponseDTO'
         '400':
           description: Pagamento não pode ser estornado
           content:

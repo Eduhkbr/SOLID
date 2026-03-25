@@ -1,4 +1,4 @@
-package br.com.fiap.PaymentSolidApi.config;
+package br.com.fiap.PaymentSolidApi.infrastructure.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
