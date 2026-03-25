@@ -43,6 +43,6 @@ public class PaymentServiceImpl implements PaymentService {
         Payment refundedPayment = paymentRepository.save(payment);
         receiptService.updateForRefund(refundedPayment);
 
-        return paymentRepository.save(payment);
+        return refundedPayment;
     }
 }
