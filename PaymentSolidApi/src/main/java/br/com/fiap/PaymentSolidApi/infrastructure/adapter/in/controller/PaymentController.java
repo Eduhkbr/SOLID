@@ -133,7 +133,7 @@ public class PaymentController implements PaymentsApi, PaymentReportOperations {
         response.setStatus(PaymentResponseDTO.StatusEnum.PENDING);
         response.setProcessedAt(now.atZone(ZoneId.systemDefault()).toOffsetDateTime());
 
-        URI uri = URI.create("/api/payments/" + paymentId);
+        URI uri = URI.create("/api/v1/payments/" + paymentId);
         return ResponseEntity.created(uri).body(response);
     }
 
@@ -177,7 +177,7 @@ public class PaymentController implements PaymentsApi, PaymentReportOperations {
     @Override
     public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable("id") UUID id) {
         throw new UnsupportedOperationException(
-                "Funcionalidade de comprovante não implementada. Use /api/payments/{id} em vez disso."
+                "Funcionalidade de comprovante não implementada. Use /api/v1/payments/{id} em vez disso."
         );
     }
 
