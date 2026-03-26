@@ -47,7 +47,7 @@ public class PaymentController implements PaymentsApi {
         var paymentOpt = paymentService.findById(id);
         return paymentOpt.map(payment ->
                 ResponseEntity.ok(PaymentMapper.toResponseDto(payment))).orElseGet(() ->
-                ResponseEntity.noContent().build());
+                ResponseEntity.notFound().build());
     }
 
     @Override
@@ -55,7 +55,7 @@ public class PaymentController implements PaymentsApi {
         var receiptOpt = receiptService.findByPaymentId(id);
         return receiptOpt.map(receipt ->
                 ResponseEntity.ok(ReceiptMapper.toResponseDto(receipt))).orElseGet(() ->
-                ResponseEntity.noContent().build());
+                ResponseEntity.notFound().build());
     }
 
     @Override
