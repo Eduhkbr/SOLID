@@ -18,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class PaymentController implements PaymentsApi {
 
     private final PaymentService paymentService;
@@ -34,7 +34,7 @@ public class PaymentController implements PaymentsApi {
     @Override
     public ResponseEntity<PaymentResponseDTO> createPayment(@RequestBody PaymentRequestDTO request) {
         final var createdPayment = paymentService.create(PaymentMapper.fromRequestDto(request));
-        final var uri = URI.create("/api/payments/" + createdPayment.getId());
+        final var uri = URI.create("/api/v1/payments/" + createdPayment.getId());
 
         var receipt = receiptFactory.createFromPayment(createdPayment);
         receiptService.create(receipt);
