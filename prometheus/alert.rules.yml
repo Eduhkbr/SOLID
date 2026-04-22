@@ -19,46 +19,53 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Instância do payment-api indisponível"
-          description: "O serviço payment-api está fora do ar há mais de 1 minuto."
+          summary: "Instancia do payment-api indisponivel"
+          description: "O servico payment-api esta fora do ar ha mais de 1 minuto."
 
       - alert: PoolConexoesExaurido
-        # Usa métricas do HikariCP para detectar quando o pool está muito utilizado
-        expr: hikari_connections_active{job="payment-api"} / hikari_connections_max{job="payment-api"} > 0.1
+        expr: hikaricp_connections_active{job="payment-api"} / hikaricp_connections_max{job="payment-api"} > 0.80
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "Pool de conexões quase esgotado"
-          description: "Mais de 10% das conexões do pool estão em uso."
+          summary: "Pool de conexoes quase esgotado (payment-api)"
+          description: "Mais de 80% das conexoes do pool estao em uso ha 5 minutos."
 
       - alert: ErroHttpElevado
-        expr: rate(http_server_requests_seconds_count{job="payment-api",status=~"5.."}[1m]) > 0.50
-        for: 1m
+        expr: sum(rate(http_server_requests_seconds_count{job="payment-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="payment-api"}[5m])) > 0.05
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Taxa de erro HTTP 5xx elevada"
-          description: "Mais de 50% das requisições estão retornando erro 5xx."
+          summary: "Taxa de erro HTTP 5xx elevada (payment-api)"
+          description: "Mais de 5% das requisicoes estao retornando erro 5xx nos ultimos 5 minutos."
 
       - alert: UsoCpuElevado
-        expr: process_cpu_usage{job="payment-api"} > 0.1
-        for: 1m
+        expr: process_cpu_usage{job="payment-api"} > 0.80
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Uso de CPU elevado"
-          description: "O uso de CPU está acima de 10% por mais de 1 minutos."
+          summary: "Uso de CPU elevado (payment-api)"
+          description: "O uso de CPU esta acima de 80% por mais de 5 minutos."
 
       - alert: UsoMemoriaElevado
-        # Proporção usada/max da heap JVM
-        expr: jvm_memory_used_bytes{area="heap",job="payment-api"} / jvm_memory_max_bytes{area="heap",job="payment-api"} > 0.10
-        for: 1m
+        expr: jvm_memory_used_bytes{area="heap",job="payment-api"} / jvm_memory_max_bytes{area="heap",job="payment-api"} > 0.85
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Uso de memória heap elevado"
-          description: "Mais de 10% da heap JVM está em uso."
+          summary: "Uso de memoria heap elevado (payment-api)"
+          description: "Mais de 85% da heap JVM esta em uso ha 5 minutos."
+
+      - alert: LatenciaElevada
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job="payment-api"}[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia P95 acima de 2s (payment-api)"
+          description: "O percentil 95 da latencia esta acima de 2 segundos."
 
       - alert: RabbitMQFilaGrande
         # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens
@@ -68,17 +75,16 @@ groups:
           severity: warning
         annotations:
           summary: "Fila RabbitMQ com mais de 5 mensagens"
-          description: "A fila RabbitMQ '{{ $labels.queue }}' está acumulando mensagens."
+          description: "A fila RabbitMQ '{{ $labels.queue }}' esta acumulando mensagens."
 
       - alert: BancoConexaoLenta
-        # Exemplo genérico: detectar aumento na taxa de conexões ativas (ajuste conforme exporter)
-        expr: rate(jdbc_connections_active{job="payment-api"}[1m]) > 1
-        for: 1m
+        expr: rate(jdbc_connections_active{job="payment-api"}[5m]) > 5
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Muitas conexões lentas ao banco de dados"
-          description: "O número de conexões lentas ao banco está acima do normal."
+          summary: "Taxa elevada de conexoes ativas ao banco (payment-api)"
+          description: "O numero de conexoes ativas ao banco esta acima do normal."
 
       # Alertas para receipt-api
       - alert: ServicoIndisponivelReceipt
@@ -88,54 +94,59 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Instância do receipt-api indisponível"
-          description: "O serviço receipt-api está fora do ar há mais de 1 minuto."
+          summary: "Instancia do receipt-api indisponivel"
+          description: "O servico receipt-api esta fora do ar ha mais de 1 minuto."
 
       - alert: PoolConexoesExauridoReceipt
-        # Usa métricas do HikariCP para detectar quando o pool do receipt-api está muito utilizado
-        expr: hikari_connections_active{job="receipt-api"} / hikari_connections_max{job="receipt-api"} > 0.1
-        for: 1m
+        expr: hikaricp_connections_active{job="receipt-api"} / hikaricp_connections_max{job="receipt-api"} > 0.80
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Pool de conexões quase esgotado (receipt-api)"
-          description: "Mais de 10% das conexões do pool do receipt-api estão em uso."
+          summary: "Pool de conexoes quase esgotado (receipt-api)"
+          description: "Mais de 80% das conexoes do pool do receipt-api estao em uso."
 
       - alert: ErroHttpElevadoReceipt
-        expr: rate(http_server_requests_seconds_count{job="receipt-api",status=~"5.."}[1m]) > 0.50
-        for: 1m
+        expr: sum(rate(http_server_requests_seconds_count{job="receipt-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="receipt-api"}[5m])) > 0.05
+        for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Taxa de erro HTTP 5xx elevada (receipt-api)"
-          description: "Mais de 50% das requisições do receipt-api estão retornando erro 5xx."
+          description: "Mais de 5% das requisicoes do receipt-api estao retornando erro 5xx."
 
       - alert: UsoCpuElevadoReceipt
-        # Uso de CPU do processo do receipt-api acima do limiar
-        expr: process_cpu_usage{job="receipt-api"} > 0.1
-        for: 1m
+        expr: process_cpu_usage{job="receipt-api"} > 0.80
+        for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Uso de CPU elevado (receipt-api)"
-          description: "O uso de CPU do receipt-api está acima de 10% por mais de 1 minuto."
+          description: "O uso de CPU do receipt-api esta acima de 80% por mais de 5 minutos."
 
       - alert: UsoMemoriaElevadoReceipt
-        # Proporção usada/max da heap JVM do receipt-api
-        expr: jvm_memory_used_bytes{area="heap",job="receipt-api"} / jvm_memory_max_bytes{area="heap",job="receipt-api"} > 0.10
-        for: 1m
+        expr: jvm_memory_used_bytes{area="heap",job="receipt-api"} / jvm_memory_max_bytes{area="heap",job="receipt-api"} > 0.85
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Uso de memória heap elevado (receipt-api)"
-          description: "Mais de 10% da heap JVM do receipt-api está em uso."
+          summary: "Uso de memoria heap elevado (receipt-api)"
+          description: "Mais de 85% da heap JVM do receipt-api esta em uso."
+
+      - alert: LatenciaElevadaReceipt
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job="receipt-api"}[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia P95 acima de 2s (receipt-api)"
+          description: "O percentil 95 da latencia do receipt-api esta acima de 2 segundos."
 
       - alert: BancoConexaoLentaReceipt
-        # Exemplo genérico para receipt-api: detectar aumento na taxa de conexões ativas lentas
-        expr: rate(jdbc_connections_active{job="receipt-api"}[1m]) > 5
+        expr: rate(jdbc_connections_active{job="receipt-api"}[5m]) > 5
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "Muitas conexões lentas ao banco de dados (receipt-api)"
-          description: "O número de conexões lentas ao banco do receipt-api está acima do normal."
+          summary: "Taxa elevada de conexoes ativas ao banco (receipt-api)"
+          description: "O numero de conexoes ativas ao banco do receipt-api esta acima do normal."

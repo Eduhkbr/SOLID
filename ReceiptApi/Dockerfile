@@ -43,6 +43,12 @@ ARG JAR_FILE=target/*.jar
 # Copia o .jar gerado no STAGE 1 para a imagem final.
 COPY --from=build /app/${JAR_FILE} app.jar
 
+# Baixa o OpenTelemetry Java Agent para instrumentação automática
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
+
+# Configura a variável de ambiente para ativar o agent
+ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
+
 # Define a propriedade do diretório e do arquivo para o novo usuário.
 # Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
 RUN chown -R appuser:appgroup /app

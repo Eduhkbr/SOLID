@@ -232,7 +232,89 @@ Exercício prático (buscar logs no Grafana):
 1. Acesse http://localhost:3000 (usuário: admin, senha: admin).
 2. Clique em "Explore".
 3. Selecione a fonte Loki.
-4. Use expressões de labels como {job="docker"} ou {app="payment-api"} e execute a query.
+4. Use expressões de labels baseadas nos nomes dos serviços do Docker Compose:
+
+**Queries Loki - Exemplos prontos para usar:**
+
+```logql
+# Ver todos os logs da payment-api
+{service="payment-api"}
+# Inclua em + Operations: Line contains e o paymentId, ex: 22608a54-5f36-49df-abc8-32d716c088e3
+
+# Ver todos os logs da receipt-api
+{service="receipt-api"}
+
+# Filtrar por aplicacao (mesmo valor que service)
+{application="payment-api"}
+
+# Ver logs do PostgreSQL
+{service="postgres-payments"}
+
+# Ver logs do RabbitMQ
+{service="rabbitmq"}
+
+# Ver logs do Nginx
+{service="nginx-lb"}
+
+# Filtrar logs que contenham ERROR ou EXCEPTION
+{service="payment-api"} |~ "(?i)error|exception"
+
+# Filtrar por nivel de log (extraido do JSON do logback)
+{service="payment-api"} | json | level="ERROR"
+
+# Buscar por traceId especifico nos logs
+{service="payment-api"} |~ "traceId"
+
+# Contar erros por servico nos ultimos 5 minutos
+sum(count_over_time({service=~"payment-api|receipt-api"} |~ "(?i)error" [5m])) by (service)
+
+# Ver todos os containers do projeto
+{project="solid"}
+
+# Filtrar por container_name especifico (util com replicas)
+{container_name=~"solid-payment-api.*"}
+```
+
+**Queries Prometheus - Exemplos prontos para usar no Explore:**
+
+```promql
+# Verificar quais servicos estao UP
+up{job=~"payment-api|receipt-api"}
+
+# Taxa de requisicoes por segundo
+sum(rate(http_server_requests_seconds_count{job="payment-api"}[1m])) by (uri, method)
+
+# Latencia P95 em milissegundos
+histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job="payment-api"}[5m])) by (le)) * 1000
+
+# Taxa de erros 5xx
+sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (job)
+
+# Uso de heap JVM (percentual)
+jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}
+
+# Conexoes ativas no HikariCP
+hikaricp_connections_active
+
+# CPU do processo
+process_cpu_usage{job=~"payment-api|receipt-api"}
+
+# Threads da JVM
+jvm_threads_live_threads
+
+# Mensagens nas filas RabbitMQ
+rabbitmq_queue_messages
+
+# Transacoes por segundo no PostgreSQL
+rate(pg_stat_database_xact_commit[1m])
+```
+
+**Queries Tempo - Exemplos de busca de traces:**
+
+No Explore, selecione o datasource Tempo e use a aba "Search":
+- Service Name: `PaymentSolidApi` ou `ReceiptApi`
+- Span Name: `GET /api/payments` ou `POST /api/payments`
+- Min Duration: `100ms` (para encontrar requisicoes lentas)
 
 7. Boas práticas para produção
 - Persistência: monte volumes para Prometheus, Alertmanager, Grafana (dashboards) e Loki.

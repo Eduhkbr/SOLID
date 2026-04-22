@@ -5,8 +5,6 @@
 # utilizando PostgreSQL, RabbitMQ, Nginx (load balancer) e dois microsserviços Java Spring Boot.
 # =========================
 
-version: '3.8'  # Versão moderna do Docker Compose
-
 services:
   # =========================
   # Serviço de Banco de Dados PostgreSQL
@@ -65,6 +63,8 @@ services:
     ports:
       - "5672:5672"    # Porta padrão do RabbitMQ
       - "15672:15672"  # Porta do painel de administração
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Shovel
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}  # Usuário padrão, definido em .env
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}  # Senha padrão, definido em .env
@@ -89,8 +89,10 @@ services:
       - payment-mq-network
       - receipt-mq-network
     depends_on:
-      - payment-api  # Garante que os microsserviços estejam prontos antes do Nginx
-      - receipt-api
+      payment-api:
+        condition: service_healthy
+      receipt-api:
+        condition: service_healthy
 
   # =========================
   # Microsserviço de Pagamentos
@@ -104,8 +106,8 @@ services:
       replicas: 2 # Cria 2 instâncias para balanceamento de carga
       resources:
         limits:
-          cpus: '0.2'   # Limita a 0.2 CPU
-          memory: 512M   # Limita a 512MB de RAM
+          cpus: '1.0'   # CPU suficiente para startup com OTel agent
+          memory: 900M   # Memória para JVM + OTel agent overhead
     networks:
       - payment-db-network  # Acesso ao PostgreSQL
       - payment-mq-network  # Acesso ao RabbitMQ
@@ -120,17 +122,20 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_SERVICE_NAME=PaymentSolidApi
     depends_on:
       postgres-payments:
         condition: service_healthy  # Só inicia após o banco estar pronto
       rabbitmq:
         condition: service_healthy  # Só inicia após o RabbitMQ estar pronto
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]  # Verifica saúde do serviço
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health/liveness || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
 
   # =========================
   # Microsserviço de Comprovantes
@@ -143,8 +148,8 @@ services:
       replicas: 2 # Cria 2 instâncias para balanceamento de carga
       resources:
         limits:
-          cpus: '0.2'   # Limita a 0.2 CPU
-          memory: 512M   # Limita a 512MB de RAM
+          cpus: '1.0'   # CPU suficiente para startup com OTel agent
+          memory: 900M   # Memória para JVM + OTel agent overhead
     networks:
       - receipt-db-network  # Acesso ao PostgreSQL
       - receipt-mq-network  # Acesso ao RabbitMQ
@@ -157,17 +162,22 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_SERVICE_NAME=ReceiptApi
     depends_on:
       postgres-receipts:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      test: [ "CMD-SHELL", "curl -f http://localhost:8083/actuator/health/liveness || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
 
   # =========================
   # Exporter do PostgreSQL (para Prometheus)
@@ -246,11 +256,19 @@ services:
       - payment-mq-network
       - receipt-mq-network
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_started
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_DEFAULT_THEME=dark
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
 
   # =========================
   # Alertmanager (Gerenciamento de Alertas)
@@ -272,18 +290,20 @@ services:
   # Loki (Centralização de Logs)
   # =========================
   loki:
-    image: grafana/loki:2.9.4
+    image: grafana/loki:3.4.2
     container_name: loki
     ports:
       - "3100:3100"  # Porta padrão da API do Loki
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - ./prometheus/loki-data/chunks:/loki/chunks
-      - ./prometheus/loki-data/index:/loki/index
-      - ./prometheus/loki-data/boltdb-cache:/loki/boltdb-cache
-      - ./prometheus/loki-data/compactor:/loki/compactor
-      - ./prometheus/loki-data/wal:/wal
+      - loki_data:/loki
       - ./prometheus/loki-config.yaml:/etc/loki/local-config.yaml
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --quiet --tries=1 --output-document=- http://localhost:3100/ready || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - payment-db-network
       - receipt-db-network
@@ -294,11 +314,12 @@ services:
   # Promtail (Coletor de Logs para o Loki)
   # =========================
   promtail:
-    image: grafana/promtail:2.9.4
+    image: grafana/promtail:3.4.2
     container_name: promtail
     volumes:
       - /var/log:/var/log
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./prometheus/promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
     networks:
@@ -317,7 +338,7 @@ services:
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ./prometheus/loki-data:/tmp/tempo
+      - tempo_data:/tmp/tempo
       - ./prometheus/tempo-config.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200"   # HTTP API (usada pelo Grafana)
@@ -334,6 +355,7 @@ volumes:
   pgdata_receipts:
   grafana_data:
   prometheus_data:  # Volume para dados do Prometheus
+  tempo_data:  # Volume para dados do Tempo
   loki_data:  # Volume para dados do Loki
 
 # =========================

@@ -1,5 +1,5 @@
 # Ignore a pasta de output do Maven.
-../ReceiptApi/target/
+target/
 
 # Ignore os diretórios do Maven wrapper. A imagem de build já tem o Maven.
 .mvn/
