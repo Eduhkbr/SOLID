@@ -66,7 +66,14 @@ class PaymentMapperTest {
         // toDomain from entity
         LocalDateTime created = LocalDateTime.now().minusDays(2);
         LocalDateTime updated = LocalDateTime.now().minusDays(1);
-        PaymentJpaEntity jpa = new PaymentJpaEntity(payment.getId(), payment.getPaymentMethod().name(), payment.getAmount(), PaymentStatus.APPROVED, created, updated);
+        PaymentJpaEntity jpa = PaymentJpaEntity.builder()
+                .id(payment.getId())
+                .paymentMethod(payment.getPaymentMethod().name())
+                .amount(payment.getAmount())
+                .status(PaymentStatus.APPROVED)
+                .createdAt(created)
+                .updatedAt(updated)
+                .build();
 
         Payment domain = PaymentMapper.toDomain(jpa);
         assertThat(domain).isNotNull();
