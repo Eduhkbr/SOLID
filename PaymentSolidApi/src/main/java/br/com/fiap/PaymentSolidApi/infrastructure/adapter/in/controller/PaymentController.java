@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class PaymentController implements PaymentsApi {
 
     private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
@@ -39,7 +39,7 @@ public class PaymentController implements PaymentsApi {
         logger.info("Requisição 'createPayment' recebida pela instância: {}", instanceId);
 
         final var createdPayment = paymentService.create(PaymentMapper.fromRequestDto(request));
-        final var uri = URI.create("/api/payments/" + createdPayment.getId());
+        final var uri = URI.create("/api/v1/payments/" + createdPayment.getId());
 
         return ResponseEntity.created(uri).body(PaymentMapper.toResponseDto(createdPayment));
     }
