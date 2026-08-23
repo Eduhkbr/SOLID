@@ -29,6 +29,9 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.routingkey.receipt}")
     private String receiptRoutingKey;
 
+    @Value("${app.rabbitmq.routingkey.receipt.refunded}")
+    private String receiptRefundedRoutingKey;
+
     @Value("${app.rabbitmq.exchange.payment.dlx}")
     private String paymentDlxExchange;
 
@@ -62,6 +65,15 @@ public class RabbitMQConfig {
                 .bind(receiptQueue)
                 .to(paymentExchange)
                 .with(receiptRoutingKey)
+                .noargs();
+    }
+
+    @Bean
+    public Binding receiptRefundedBinding(Queue receiptQueue, Exchange paymentExchange) {
+        return BindingBuilder
+                .bind(receiptQueue)
+                .to(paymentExchange)
+                .with(receiptRefundedRoutingKey)
                 .noargs();
     }
 

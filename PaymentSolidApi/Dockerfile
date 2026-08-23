@@ -3,21 +3,23 @@
 # Esta imagem é grande, mas será descartada no final.
 FROM maven:3.9-eclipse-temurin-21 AS build
 
-# Define o diretório de trabalho dentro do contêiner.
 WORKDIR /app
 
-# Copia o pom.xml primeiro para aproveitar o cache de camadas do Docker.
-# Se as dependências não mudarem, esta camada não será re-executada.
-COPY pom.xml .
+# Copia os manifests primeiro para aproveitar o cache de dependencias.
+COPY pom.xml ./
+COPY solid-contracts/pom.xml solid-contracts/pom.xml
+COPY PaymentSolidApi/pom.xml PaymentSolidApi/pom.xml
+COPY ReceiptApi/pom.xml ReceiptApi/pom.xml
 
-# Baixa todas as dependências do projeto.
-RUN mvn dependency:go-offline
+# Baixa as dependencias necessarias para o modulo de pagamentos e seus prerequisitos.
+RUN mvn -pl PaymentSolidApi -am dependency:go-offline
 
-# Copia o restante do código-fonte.
-COPY src ./src
+# Copia o codigo-fonte necessario para o build multi-modulo.
+COPY solid-contracts/src solid-contracts/src
+COPY PaymentSolidApi/src PaymentSolidApi/src
 
 # Compila o projeto e gera o arquivo .jar. O -DskipTests acelera o build.
-RUN mvn clean install -DskipTests
+RUN mvn -pl PaymentSolidApi -am clean install -DskipTests
 
 
 # ================= STAGE 2: Runtime =================
@@ -38,16 +40,10 @@ RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 WORKDIR /app
 
 # Argumento para o nome do JAR, permitindo que seja reutilizável.
-ARG JAR_FILE=target/*.jar
+ARG JAR_FILE=PaymentSolidApi/target/*.jar
 
 # Copia o .jar gerado no STAGE 1 para a imagem final.
 COPY --from=build /app/${JAR_FILE} app.jar
-
-# Copia o OpenTelemetry Java Agent para a imagem (certifique-se de baixar o .jar para o diretório do Dockerfile)
-COPY opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
-
-# Configura a variável de ambiente para ativar o agent
-ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
 
 # Define a propriedade do diretório e do arquivo para o novo usuário.
 # Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.

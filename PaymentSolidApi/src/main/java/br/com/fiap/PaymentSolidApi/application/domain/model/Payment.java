@@ -2,8 +2,11 @@ package br.com.fiap.PaymentSolidApi.application.domain.model;
 
 import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
 import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentRefundException;
+import br.com.fiap.PaymentSolidApi.application.domain.policy.PaymentMethodPolicies;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -68,20 +71,18 @@ public class Payment {
     }
 
     public void refund() {
-        isRefundable();
+        List<String> errors = new ArrayList<>();
+        PaymentMethodPolicies.forMethod(this.paymentMethod).validateRefund(this, errors);
+        if (this.status != PaymentStatus.PENDING) {
+            errors.add("Estorno não permitido: o pagamento deve estar no status 'PENDING', mas está em '" + this.status + "'.");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new PaymentRefundException(String.join(" ", errors));
+        }
 
         this.status = PaymentStatus.REFUNDED;
         this.updatedAt = LocalDateTime.now();
-    }
-
-    private void isRefundable() {
-        if (this.paymentMethod == PaymentMethod.PIX) {
-            throw new PaymentRefundException("Estorno não permitido: o método de pagamento 'PIX' não suporta esta operação.");
-        }
-
-        if (this.status != PaymentStatus.PENDING) {
-            throw new PaymentRefundException("Estorno não permitido: o pagamento deve estar no status 'PENDING', mas está em '" + this.status + "'.");
-        }
     }
 
     /**

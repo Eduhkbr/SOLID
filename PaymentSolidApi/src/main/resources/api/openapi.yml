@@ -4,7 +4,7 @@ info:
   description: API para processar e gerenciar pagamentos através de diferentes métodos (Cartão de Crédito, PIX, Boleto).
   version: 1.0.0
 servers:
-  - url: http://localhost:8082/api
+  - url: http://localhost:8082/api/v1
     description: Servidor de Desenvolvimento
 tags:
   - name: Payments
@@ -131,6 +131,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponseDTO'
+        '409':
+          description: Conflito de estado ou regra de negócio para estorno.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponseDTO'
         '404':
           description: Pagamento não encontrado.
           content:
@@ -227,12 +233,22 @@ components:
     ErrorResponseDTO:
       type: object
       properties:
+        code:
+          type: string
+          description: Código estável para classificação do erro
+          example: "PAYMENT_NOT_FOUND"
         message:
           type: string
           description: Descrição do erro
           example: "Pagamento não encontrado"
-        timestamp:
+        details:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Detalhes adicionais do erro (opcional)
+        traceId:
           type: string
-          format: date-time
-          description: Data e hora em que o erro ocorreu
-          example: '2025-09-13T19:00:00Z'
+          description: Identificador para correlação e troubleshooting
+          example: "a4f8d104-b583-4f15-a585-9474f43bd4b7"

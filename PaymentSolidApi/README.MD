@@ -6,12 +6,12 @@ Este projeto utiliza **OpenAPI Codegen** para gerar automaticamente os contratos
 
 ## Etapas obrigatórias antes de subir a aplicação
 
-### 1. Rodar o `mvn clean install` com o perfil de teste
+### 1. Rodar o build da plataforma com o perfil de teste
 
-Antes de iniciar a aplicação, é **obrigatório compilar o projeto** usando o perfil `test`. Isso garante que os arquivos gerados pelo OpenAPI Codegen estejam disponíveis e que o build seja concluído corretamente, sem exigir conexão com banco de dados.
+Antes de iniciar a aplicação, é **obrigatório compilar a plataforma** usando o perfil `test`. Isso garante que os arquivos gerados pelo OpenAPI Codegen estejam disponíveis, que o modulo de contratos compartilhados esteja resolvido e que o build seja concluído corretamente, sem exigir conexão com banco de dados.
 
 ```bash
-mvn clean install -Dspring.profiles.active=test
+./mvnw clean install -Dspring.profiles.active=test
 ```
 
 ### 2. Subir a aplicação

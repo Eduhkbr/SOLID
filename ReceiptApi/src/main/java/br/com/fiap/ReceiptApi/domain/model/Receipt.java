@@ -10,6 +10,7 @@ public class Receipt {
     private UUID paymentId;
     private String receiptData;
     private LocalDateTime createdAt;
+    private String cached;
 
     public Receipt() {}
 

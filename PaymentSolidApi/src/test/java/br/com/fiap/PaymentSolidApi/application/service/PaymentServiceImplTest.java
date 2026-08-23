@@ -41,6 +41,7 @@ class PaymentServiceImplTest {
         assertThat(result).isEqualTo(payment);
         verify(repository, times(1)).save(payment);
         verify(publisher, times(1)).publishPaymentProcessedEvent(payment);
+        verify(publisher, never()).publishPaymentRefundedEvent(any());
     }
 
     @Test
@@ -55,6 +56,7 @@ class PaymentServiceImplTest {
         assertThat(refunded.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(repository, times(1)).findById(id);
         verify(repository, times(1)).save(refunded);
+        verify(publisher, times(1)).publishPaymentRefundedEvent(refunded);
     }
 
     @Test
@@ -68,5 +70,6 @@ class PaymentServiceImplTest {
 
         verify(repository, times(1)).findById(id);
         verify(repository, never()).save(any());
+        verify(publisher, never()).publishPaymentRefundedEvent(any());
     }
 }

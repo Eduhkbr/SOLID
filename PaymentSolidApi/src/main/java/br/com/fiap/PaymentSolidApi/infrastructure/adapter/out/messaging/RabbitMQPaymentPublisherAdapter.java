@@ -2,7 +2,8 @@ package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.messaging;
 
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 import br.com.fiap.PaymentSolidApi.application.port.out.PaymentEventPublisherPort;
-import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.messaging.dto.PaymentProcessedEventDTO;
+import br.com.fiap.solid.contracts.event.v1.PaymentProcessedEvent;
+import br.com.fiap.solid.contracts.event.v1.PaymentRefundedEvent;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -12,22 +13,42 @@ public class RabbitMQPaymentPublisherAdapter implements PaymentEventPublisherPor
 
     private final RabbitTemplate rabbitTemplate;
     private final String paymentExchange;
-    private final String receiptRoutingKey;
+    private final String receiptProcessedRoutingKey;
+    private final String receiptRefundedRoutingKey;
 
     public RabbitMQPaymentPublisherAdapter(RabbitTemplate rabbitTemplate,
                                            @Value("${app.rabbitmq.exchange.payment}") String paymentExchange,
-                                           @Value("${app.rabbitmq.routingkey.receipt}") String receiptRoutingKey) {
+                                           @Value("${app.rabbitmq.routingkey.receipt}") String receiptProcessedRoutingKey,
+                                           @Value("${app.rabbitmq.routingkey.receipt.refunded}") String receiptRefundedRoutingKey) {
         this.rabbitTemplate = rabbitTemplate;
         this.paymentExchange = paymentExchange;
-        this.receiptRoutingKey = receiptRoutingKey;
+        this.receiptProcessedRoutingKey = receiptProcessedRoutingKey;
+        this.receiptRefundedRoutingKey = receiptRefundedRoutingKey;
     }
 
     @Override
     public void publishPaymentProcessedEvent(Payment payment) {
-        // 1. Converte o objeto de domínio para o DTO do evento.
-        PaymentProcessedEventDTO eventDTO = new PaymentProcessedEventDTO(payment);
+        PaymentProcessedEvent event = new PaymentProcessedEvent(
+                payment.getId(),
+                payment.getPaymentMethod().name(),
+                payment.getAmount(),
+                payment.getStatus().name(),
+                payment.getCreatedAt(),
+                payment.getUpdatedAt()
+        );
+        rabbitTemplate.convertAndSend(paymentExchange, receiptProcessedRoutingKey, event);
+    }
 
-        // 2. Envia a mensagem para a exchange com a routing key específica.
-        rabbitTemplate.convertAndSend(paymentExchange, receiptRoutingKey, eventDTO);
+    @Override
+    public void publishPaymentRefundedEvent(Payment payment) {
+        PaymentRefundedEvent event = new PaymentRefundedEvent(
+                payment.getId(),
+                payment.getPaymentMethod().name(),
+                payment.getAmount(),
+                payment.getStatus().name(),
+                payment.getCreatedAt(),
+                payment.getUpdatedAt()
+        );
+        rabbitTemplate.convertAndSend(paymentExchange, receiptRefundedRoutingKey, event);
     }
 }

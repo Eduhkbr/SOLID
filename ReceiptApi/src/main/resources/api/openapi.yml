@@ -35,8 +35,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReceiptResponseDTO'
-        '204':
+        '404':
           description: Comprovante não encontrado para o ID de pagamento informado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponseDTO'
 
 components:
   schemas:
@@ -61,3 +65,26 @@ components:
           type: string
           format: date-time
           description: Data e hora em que o comprovante foi gerado.
+
+    ErrorResponseDTO:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Código estável para classificação do erro
+          example: "RECEIPT_NOT_FOUND"
+        message:
+          type: string
+          description: Descrição do erro
+          example: "Comprovante não encontrado para o pagamento: a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        details:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Detalhes adicionais do erro (opcional)
+        traceId:
+          type: string
+          description: Identificador para correlação e troubleshooting
+          example: "a4f8d104-b583-4f15-a585-9474f43bd4b7"

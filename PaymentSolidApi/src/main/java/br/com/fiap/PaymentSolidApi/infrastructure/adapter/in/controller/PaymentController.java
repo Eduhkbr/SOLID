@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.UUID;
 
+import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentNotFoundException;
 import br.com.fiap.PaymentSolidApi.application.port.in.PaymentService;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.persistence.repository.mappers.PaymentMapper;
 import br.com.fiap.paymentsolidiapi.api.PaymentsApi;
@@ -48,10 +49,9 @@ public class PaymentController implements PaymentsApi {
     public ResponseEntity<PaymentResponseDTO> findPaymentById(@PathVariable("id") UUID id) {
         logger.info("Requisição 'findPaymentById' para o ID {} recebida pela instância: {}", id, instanceId);
 
-        var paymentOpt = paymentService.findById(id);
-        return paymentOpt.map(payment ->
-                ResponseEntity.ok(PaymentMapper.toResponseDto(payment))).orElseGet(() ->
-                ResponseEntity.noContent().build());
+        var payment = paymentService.findById(id)
+                .orElseThrow(() -> new PaymentNotFoundException(id.toString()));
+        return ResponseEntity.ok(PaymentMapper.toResponseDto(payment));
     }
 
     @Override

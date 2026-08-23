@@ -28,15 +28,11 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     @Override
     public void createReceiptFromPaymentInfo(PaymentVO vo) {
-        System.out.println("LOG: Gerando comprovante para o pagamento ID: " + vo.id());
+        logger.info("Gerando comprovante para o pagamento {}", vo.id());
 
-        // Usa a factory para criar o objeto de domínio
         Receipt newReceipt = receiptFactory.createFromPayment(vo);
-
-        // Usa a porta de saída para persistir o objeto
         receiptRepository.create(newReceipt);
-
-        System.out.println("LOG: Comprovante para o pagamento ID " + vo.id() + " salvo com sucesso!");
+        logger.info("Comprovante do pagamento {} salvo com sucesso", vo.id());
     }
 
     @Override

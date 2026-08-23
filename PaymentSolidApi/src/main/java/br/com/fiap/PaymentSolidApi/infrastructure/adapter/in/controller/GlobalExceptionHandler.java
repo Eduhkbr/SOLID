@@ -8,13 +8,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.slf4j.MDC;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -22,53 +23,57 @@ public class GlobalExceptionHandler {
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(PaymentNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ResponseEntity<Map<String, String>> handlePaymentNotFound(PaymentNotFoundException ex) {
+    public ResponseEntity<Map<String, Object>> handlePaymentNotFound(PaymentNotFoundException ex) {
         logger.warn("Pagamento não encontrado: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
-        Map<String, String> error = new HashMap<>();
-        error.put("error", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", ex.getMessage(), null);
     }
 
     @ExceptionHandler(PaymentValidationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handlePaymentValidation(PaymentValidationException ex) {
         logger.warn("Erro de validação de pagamento: {} - detalhes: {}", ex.getClass().getSimpleName(), ex.getErrors());
-        Map<String, Object> error = new HashMap<>();
-        error.put("error", "Erro de validação");
-        error.put("details", ex.getErrors());
-        return ResponseEntity.badRequest().body(error);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "PAYMENT_VALIDATION_ERROR", "Erro de validação", ex.getErrors());
     }
 
     @ExceptionHandler(PaymentRefundException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public ResponseEntity<Map<String, String>> handlePaymentRefundException(PaymentRefundException ex) {
+    public ResponseEntity<Map<String, Object>> handlePaymentRefundException(PaymentRefundException ex) {
         logger.warn("Conflito ao processar estorno: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
-        Map<String, String> error = new HashMap<>();
-        error.put("error", "Conflito ao processar estorno");
-        error.put("details", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return buildErrorResponse(HttpStatus.CONFLICT, "PAYMENT_REFUND_CONFLICT", "Conflito ao processar estorno", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
         logger.warn("Erro de validação nos parâmetros: {} - detalhes: {}", ex.getClass().getSimpleName(), ex.getBindingResult().getFieldErrors().toString());
-        Map<String, Object> error = new HashMap<>();
-        error.put("error", "Erro de validação nos parâmetros");
-        error.put("details", ex.getBindingResult().getFieldErrors().stream()
-                .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
-                .toList());
-        return ResponseEntity.badRequest().body(error);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "REQUEST_VALIDATION_ERROR", "Erro de validação nos parâmetros",
+                ex.getBindingResult().getFieldErrors().stream()
+                        .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
+                        .toList());
     }
 
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         logger.error("Erro interno do servidor: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
-        Map<String, String> error = new HashMap<>();
-        error.put("error", "Erro interno do servidor");
-        error.put("details", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Erro interno do servidor", ex.getMessage());
+    }
+
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String code, String message, Object details) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", code);
+        error.put("message", message);
+        error.put("traceId", resolveTraceId());
+        if (details != null) {
+            error.put("details", details);
+        }
+        return ResponseEntity.status(status).body(error);
+    }
+
+    private String resolveTraceId() {
+        String traceId = MDC.get("traceId");
+        if (traceId == null || traceId.isBlank()) {
+            traceId = MDC.get("X-Request-ID");
+        }
+        if (traceId == null || traceId.isBlank()) {
+            traceId = UUID.randomUUID().toString();
+        }
+        return traceId;
     }
 }

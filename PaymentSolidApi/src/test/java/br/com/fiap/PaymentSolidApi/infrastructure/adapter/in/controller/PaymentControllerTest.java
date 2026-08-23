@@ -1,5 +1,6 @@
 package br.com.fiap.PaymentSolidApi.infrastructure.adapter.in.controller;
 
+import br.com.fiap.PaymentSolidApi.application.domain.exception.PaymentNotFoundException;
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 import br.com.fiap.PaymentSolidApi.application.port.in.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -58,12 +60,12 @@ class PaymentControllerTest {
     }
 
     @Test
-    void findPaymentById_returnsNoContent_whenNotFound() {
+    void findPaymentById_throwsNotFound_whenNotFound() {
         UUID id = UUID.randomUUID();
         when(paymentService.findById(id)).thenReturn(Optional.empty());
 
-        ResponseEntity<PaymentResponseDTO> response = controller.findPaymentById(id);
-        assertThat(response.getStatusCode().value()).isEqualTo(204);
-        assertThat(response.getBody()).isNull();
+        assertThatThrownBy(() -> controller.findPaymentById(id))
+                .isInstanceOf(PaymentNotFoundException.class)
+                .hasMessageContaining(id.toString());
     }
 }

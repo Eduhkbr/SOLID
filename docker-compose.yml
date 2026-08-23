@@ -100,14 +100,14 @@ services:
   payment-api:
     # build local a partir do Dockerfile do projeto
     build:
-      context: ./PaymentSolidApi  # Diretório do projeto Java
-      dockerfile: Dockerfile      # Dockerfile a ser usado
+      context: .                  # Contexto raiz para incluir parent e contratos compartilhados
+      dockerfile: ./PaymentSolidApi/Dockerfile
     deploy:
       replicas: 2 # Cria 2 instâncias para balanceamento de carga
       resources:
         limits:
-          cpus: '0.2'   # Limita a 0.2 CPU
-          memory: 512M   # Limita a 512MB de RAM
+          cpus: '0.5'   # Aumentado de 0.2 para reduzir tempo de startup (~138s com 0.2 CPU)
+          memory: 768M   # Aumentado de 512M (Spring Boot + OTEL têm footprint maior)
     networks:
       - payment-db-network  # Acesso ao PostgreSQL
       - payment-mq-network  # Acesso ao RabbitMQ
@@ -128,25 +128,25 @@ services:
       rabbitmq:
         condition: service_healthy  # Só inicia após o RabbitMQ estar pronto
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]  # Verifica saúde do serviço
-      interval: 30s
+      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]
+      interval: 15s   # Mais frequente para detectar prontidão mais rápido
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5      # Aumentado: falhas durante startup não marcam o container como unhealthy
+      start_period: 210s  # Margem segura acima do tempo real observado (~138s com CPU limitada)
 
   # =========================
   # Microsserviço de Comprovantes
   # =========================
   receipt-api:
     build:
-      context: ./ReceiptApi
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./ReceiptApi/Dockerfile
     deploy:
       replicas: 2 # Cria 2 instâncias para balanceamento de carga
       resources:
         limits:
-          cpus: '0.2'   # Limita a 0.2 CPU
-          memory: 512M   # Limita a 512MB de RAM
+          cpus: '0.5'   # Aumentado de 0.2 para reduzir tempo de startup
+          memory: 768M   # Aumentado de 512M
     networks:
       - receipt-db-network  # Acesso ao PostgreSQL
       - receipt-mq-network  # Acesso ao RabbitMQ
@@ -166,10 +166,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1" ]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 210s  # Margem segura acima do tempo real de startup
 
   # =========================
   # Exporter do PostgreSQL (para Prometheus)

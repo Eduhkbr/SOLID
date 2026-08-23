@@ -56,6 +56,7 @@ public class PaymentServiceImpl implements PaymentService {
         payment.refund();
         Payment refunded = paymentRepository.save(payment);
         logger.info("Pagamento estornado com sucesso: {}", id);
+        paymentEventPublisher.publishPaymentRefundedEvent(refunded);
         return refunded;
     }
 }
