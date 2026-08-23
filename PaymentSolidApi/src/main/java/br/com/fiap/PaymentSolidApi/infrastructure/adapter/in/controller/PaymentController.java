@@ -25,7 +25,7 @@ public class PaymentController implements PaymentsApi {
     @Override
     public ResponseEntity<PaymentResponseDTO> createPayment(@RequestBody PaymentRequestDTO request) {
         final var createdPayment = paymentService.create(PaymentMapper.fromRequestDto(request));
-        final var uri = URI.create("/api/payments/" + createdPayment.getId());
+        final var uri = URI.create("/api/v1/payments/" + createdPayment.getId());
 
         return ResponseEntity.created(uri).body(PaymentMapper.toResponseDto(createdPayment));
     }
@@ -37,11 +37,6 @@ public class PaymentController implements PaymentsApi {
                 ResponseEntity.ok(PaymentMapper.toResponseDto(payment))).orElseGet(() ->
                 ResponseEntity.noContent().build());
     }
-
-//    @Override
-//    public ResponseEntity<ReceiptResponseDTO> findReceiptById(@PathVariable("id") UUID id) {
-//        return null;
-//    }
 
     @Override
     public ResponseEntity<PaymentResponseDTO> refundPayment(@PathVariable("id") UUID id) {
