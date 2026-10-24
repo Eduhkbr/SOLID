@@ -28,6 +28,8 @@ public class PaymentProcessedEventDTO implements Serializable {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime processedAt;
+    private UUID eventId;
+    private Long aggregateVersion;
 
     /**
      * Construtor de conveniência que atua como um Mapper.
@@ -40,5 +42,15 @@ public class PaymentProcessedEventDTO implements Serializable {
         this.status = payment.status();
         this.createdAt = payment.createdAt();
         this.processedAt = payment.updatedAt();
+    }
+
+    public PaymentProcessedEventDTO(UUID paymentId, String paymentMethod, BigDecimal amount,
+                                    String status, LocalDateTime createdAt, LocalDateTime processedAt) {
+        this.paymentId = paymentId;
+        this.paymentMethod = paymentMethod;
+        this.amount = amount;
+        this.status = status;
+        this.createdAt = createdAt;
+        this.processedAt = processedAt;
     }
 }

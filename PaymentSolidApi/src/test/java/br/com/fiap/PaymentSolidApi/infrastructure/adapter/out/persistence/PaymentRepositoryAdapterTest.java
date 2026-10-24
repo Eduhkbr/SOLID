@@ -36,27 +36,32 @@ class PaymentRepositoryAdapterTest {
         try (MockedStatic<PaymentMapper> mapperMock = Mockito.mockStatic(PaymentMapper.class)) {
             mapperMock.when(() -> PaymentMapper.toEntity(any())).thenReturn(entity);
             mapperMock.when(() -> PaymentMapper.toDomain(entity)).thenReturn(payment);
+            when(jpaRepository.existsById(entity.getId())).thenReturn(false);
             Mockito.when(jpaRepository.save(entity)).thenReturn(entity);
             Payment result = adapter.save(payment);
             assertThat(result).isEqualTo(payment);
-            verify(jpaRepository).save(entity);
+            assertThat(entity.isNew()).isTrue();
+            verify(jpaRepository).existsById(entity.getId());
         }
     }
 
     @Test
-    void save_existing_payment_delegates_to_spring_data_once() {
+    void save_existing_payment_uses_merge_without_retrying_failed_insert() {
         Payment payment = Payment.create(Payment.PaymentMethod.CREDIT_CARD, new BigDecimal("20.00"), null, "1111222233334444", "123");
         PaymentJpaEntity entity = new PaymentJpaEntity();
         entity.setId(payment.getId());
         try (MockedStatic<PaymentMapper> mapperMock = Mockito.mockStatic(PaymentMapper.class)) {
             mapperMock.when(() -> PaymentMapper.toEntity(payment)).thenReturn(entity);
             mapperMock.when(() -> PaymentMapper.toDomain(entity)).thenReturn(payment);
+            when(jpaRepository.existsById(entity.getId())).thenReturn(true);
             when(jpaRepository.save(entity)).thenReturn(entity);
 
             Payment result = adapter.save(payment);
 
             assertThat(result).isEqualTo(payment);
+            assertThat(entity.isNew()).isFalse();
             verify(jpaRepository).save(entity);
+            verify(jpaRepository).existsById(entity.getId());
         }
     }
 
