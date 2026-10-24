@@ -26,6 +26,10 @@ public class Receipt {
      * @param refundedPaymentVO O objeto de pagamento que foi estornado.
      */
     public void updateForRefund(PaymentVO refundedPaymentVO) {
+        if (receiptData.contains("--- ESTORNO REALIZADO ---")) {
+            return;
+        }
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
         String refundTimestamp = refundedPaymentVO.updatedAt().format(formatter);
 

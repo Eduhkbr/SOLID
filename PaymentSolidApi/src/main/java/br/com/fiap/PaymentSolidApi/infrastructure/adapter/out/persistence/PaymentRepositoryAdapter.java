@@ -21,6 +21,9 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     @Override
     public Payment save(Payment payment) {
         PaymentJpaEntity entity = PaymentMapper.toEntity(payment);
+        // O domínio atribui UUID antes da persistência; por isso, o ID não indica
+        // se o Spring Data deve inserir (persist) ou atualizar (merge) a entidade.
+        entity.setNew(!jpaRepository.existsById(entity.getId()));
         PaymentJpaEntity saved = jpaRepository.save(entity);
         return PaymentMapper.toDomain(saved);
     }

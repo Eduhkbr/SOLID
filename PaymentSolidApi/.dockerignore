@@ -1,44 +1,41 @@
-# Ignore a pasta de output do Maven.
-../PaymentSolidApi/target/
+# O contexto do build é PaymentSolidApi. O target do outro serviço fica fora
+# deste contexto e, por isso, não precisa ser listado aqui.
 
-# Ignore os diretórios do Maven wrapper. A imagem de build já tem o Maven.
+# Ignora saídas geradas pelo Maven para não enviá-las ao daemon Docker.
+/target/
+**/target/
+
+# A imagem usa Maven já instalado; o wrapper não é necessário no contexto.
 .mvn/
 mvnw
 mvnw.cmd
 
-# Ignore o diretório do Git
+# Metadados Git não participam da compilação da imagem.
 .git/
+**/.git/
 .gitignore
 .gitattributes
 
-# Ignore arquivos e pastas de configuração de IDEs.
-# IntelliJ
+# Configurações locais de IDE não fazem parte da aplicação.
 .idea/
+**/.idea/
 *.iml
 *.iws
-
-# Eclipse
 .settings/
 .project
 .classpath
-
-# VS Code
 .vscode/
+**/.vscode/
 
-# Ignore arquivos de log
+# Logs locais e arquivos do sistema operacional.
 *.log
 npm-debug.log
+.DS_Store
+Thumbs.db
 
-# Ignore os próprios arquivos do Docker, eles não precisam estar no contexto.
+# Arquivos de instrução e configuração do Docker não são necessários no
+# contexto usado para compilar este módulo.
+README.md
 Dockerfile
 .dockerignore
 docker-compose.yml
-
-# Ignore arquivos de sistema operacional
-# macOS
-.DS_Store
-# Windows
-Thumbs.db
-
-# Ignore arquivos de documentação que não são necessários na imagem
-README.md

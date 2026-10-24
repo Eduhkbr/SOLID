@@ -17,11 +17,13 @@
     <properties>
         <java.version>21</java.version>
         <springdoc.version>2.3.0</springdoc.version>
+        <opentelemetry.version>1.38.0</opentelemetry.version>
         <jackson-databind-nullable.version>0.2.6</jackson-databind-nullable.version>
         <byte-buddy-agent.version>1.17.7</byte-buddy-agent.version>
         <lombok.version>1.18.38</lombok.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <sonar.organization>eduhkbr</sonar.organization>
     </properties>
 
     <dependencies>
@@ -39,11 +41,28 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <version>${opentelemetry.version}</version>
         </dependency>
 
         <!-- Development Tools -->
@@ -70,6 +89,14 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
         <!-- Utilities -->
@@ -104,6 +131,12 @@
             <artifactId>byte-buddy-agent</artifactId>
             <version>${byte-buddy-agent.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
         </dependency>
 
     </dependencies>
@@ -205,8 +238,11 @@
                 <configuration>
                     <systemPropertyVariables>
                         <spring.profiles.active>test</spring.profiles.active>
+                        <spring.flyway.enabled>false</spring.flyway.enabled>
+                        <app.outbox.enabled>false</app.outbox.enabled>
                     </systemPropertyVariables>
                     <argLine>
+                        ${argLine}
                         --add-opens java.base/java.lang=ALL-UNNAMED
                         --add-opens java.base/java.lang.reflect=ALL-UNNAMED
                         -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy-agent.version}/byte-buddy-agent-${byte-buddy-agent.version}.jar
@@ -214,6 +250,43 @@
                 </configuration>
             </plugin>
 
+            <!-- JaCoCo for coverage reporting (exclude generated OpenAPI code) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.10</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Generate XML report for SonarCloud -->
+                            <outputDirectory>${project.build.directory}/jacoco</outputDirectory>
+                            <formats>
+                                <format>XML</format>
+                                <format>HTML</format>
+                            </formats>
+                            <excludes>
+                                <exclude>org/openapitools/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>5.2.0.4988</version>
+            </plugin>
         </plugins>
     </build>
 

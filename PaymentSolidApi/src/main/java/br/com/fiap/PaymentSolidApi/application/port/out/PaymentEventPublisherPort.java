@@ -4,6 +4,6 @@ import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 
 public interface PaymentEventPublisherPort {
 
-    // Publica um evento indicando que um pagamento foi processado
-    void publishPaymentProcessedEvent(Payment payment);
+    // Registra a mudança de estado para publicação confiável após o commit local.
+    void publishPaymentStateChangedEvent(Payment payment);
 }

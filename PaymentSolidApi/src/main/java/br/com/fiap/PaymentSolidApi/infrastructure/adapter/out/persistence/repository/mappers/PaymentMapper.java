@@ -60,14 +60,14 @@ public class PaymentMapper {
     public static PaymentJpaEntity toEntity(Payment payment) {
         if (payment == null) return null;
 
-        return new PaymentJpaEntity(
-                payment.getId(),
-                payment.getPaymentMethod().name(),
-                payment.getAmount(),
-                payment.getStatus(),
-                payment.getCreatedAt(),
-                payment.getUpdatedAt()
-        );
+        return PaymentJpaEntity.builder()
+                .id(payment.getId())
+                .paymentMethod(payment.getPaymentMethod().name())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .createdAt(payment.getCreatedAt())
+                .updatedAt(payment.getUpdatedAt())
+                .build();
     }
 
     /**
