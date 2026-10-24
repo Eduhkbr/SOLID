@@ -5,18 +5,35 @@
 # desenvolvimento/local — em produção normalmente você terá rotas, inibidores,
 # receptores com webhooks e templates de mensagem.
 
-# 'route' define o caminho padrão para roteamento de alertas. Aqui, todos os
-# alertas vão para o receiver 'default'. Em producao você pode criar rotas
-# filtrando por labels (e.g. severity) para enviar a canais diferentes.
+# 'route' define o caminho padrão de roteamento e agrupamento das notificações.
+# group_by usa os rótulos que definem uma ocorrência operacional; instance fica
+# fora da chave para que réplicas do mesmo alerta sejam enviadas juntas.
+# group_wait controla o primeiro envio, group_interval agrupa novas mudanças e
+# repeat_interval limita a repetição de um grupo que continua ativo.
 route:
-  receiver: 'default'
+  receiver: 'aula-webhook'
+  group_by: ['alertname', 'job', 'severity']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+  routes:
+    # Alertas críticos recebem uma janela inicial menor; neste laboratório usam
+    # o mesmo receiver para que o comportamento possa ser demonstrado localmente.
+    - matchers:
+        - severity="critical"
+      receiver: 'aula-webhook'
+      group_wait: 5s
 
-# 'receivers' descreve como notificar o destino. No exemplo abaixo o receiver
-# 'default' não faz notificações externas — apenas existe para a interface web
-# e para permitir testes. Para notificações reais, adicione campos como
-# 'email_configs', 'slack_configs' ou 'webhook_configs'.
+# 'receivers' descreve os destinos das notificações. Este receiver local registra
+# firing e resolved para tornar o ciclo observável sem credenciais externas.
+# Em produção, substitua ou complemente o webhook com email, Slack, PagerDuty ou
+# outro canal, incluindo autenticação, TLS, política de deduplicação e limites.
 receivers:
-  - name: 'default'
+  - name: 'aula-webhook'
+    webhook_configs:
+      - url: 'http://alert-webhook-sink:8080/notifications'
+        send_resolved: true
+        max_alerts: 0
 
 # Observações rápidas:
 # - consulte a documentação do Alertmanager para exemplos de configuração mais

@@ -29,7 +29,7 @@ groups:
           severity: warning
         annotations:
           summary: "Pool de conexoes quase esgotado (payment-api)"
-          description: "Mais de 80% das conexoes do pool estao em uso ha 5 minutos."
+          description: "Mais de 80% das conexoes do pool de pagamentos estao em uso ha 1 minuto."
 
       - alert: ErroHttpElevado
         expr: sum(rate(http_server_requests_seconds_count{job="payment-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="payment-api"}[5m])) > 0.05
@@ -67,24 +67,26 @@ groups:
           summary: "Latencia P95 acima de 2s (payment-api)"
           description: "O percentil 95 da latencia esta acima de 2 segundos."
 
+      - alert: RabbitMQIndisponivel
+        # O scrape do endpoint nativo cobre indisponibilidade do broker ou do endpoint de métricas.
+        expr: up{job="rabbitmq"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ indisponível para coleta de métricas"
+          description: "O endpoint Prometheus do RabbitMQ não responde em {{ $labels.instance }} há mais de 30 segundos."
+
       - alert: RabbitMQFilaGrande
-        # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens
-        expr: rabbitmq_queue_messages{queue=~".*"} > 5
+        # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens.
+        expr: rabbitmq_detailed_queue_messages{queue=~".*"} > 5
         for: 1m
         labels:
           severity: warning
         annotations:
           summary: "Fila RabbitMQ com mais de 5 mensagens"
           description: "A fila RabbitMQ '{{ $labels.queue }}' esta acumulando mensagens."
-
-      - alert: BancoConexaoLenta
-        expr: rate(jdbc_connections_active{job="payment-api"}[5m]) > 5
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Taxa elevada de conexoes ativas ao banco (payment-api)"
-          description: "O numero de conexoes ativas ao banco esta acima do normal."
 
       # Alertas para receipt-api
       - alert: ServicoIndisponivelReceipt
@@ -96,15 +98,6 @@ groups:
         annotations:
           summary: "Instancia do receipt-api indisponivel"
           description: "O servico receipt-api esta fora do ar ha mais de 1 minuto."
-
-      - alert: PoolConexoesExauridoReceipt
-        expr: hikaricp_connections_active{job="receipt-api"} / hikaricp_connections_max{job="receipt-api"} > 0.80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Pool de conexoes quase esgotado (receipt-api)"
-          description: "Mais de 80% das conexoes do pool do receipt-api estao em uso."
 
       - alert: ErroHttpElevadoReceipt
         expr: sum(rate(http_server_requests_seconds_count{job="receipt-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="receipt-api"}[5m])) > 0.05
@@ -142,11 +135,38 @@ groups:
           summary: "Latencia P95 acima de 2s (receipt-api)"
           description: "O percentil 95 da latencia do receipt-api esta acima de 2 segundos."
 
-      - alert: BancoConexaoLentaReceipt
-        expr: rate(jdbc_connections_active{job="receipt-api"}[5m]) > 5
-        for: 1m
+      - alert: PoolConexoesElevadoReceipt
+        expr: hikaricp_connections_active{job="receipt-api"} / hikaricp_connections_max{job="receipt-api"} > 0.80
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Taxa elevada de conexoes ativas ao banco (receipt-api)"
-          description: "O numero de conexoes ativas ao banco do receipt-api esta acima do normal."
+          summary: "Pool de conexoes acima de 80% (receipt-api)"
+          description: "Mais de 80% das conexoes do pool Hikari estao em uso ha 5 minutos."
+
+      - alert: OutboxPaymentPendente
+        expr: payment_outbox_pending{job="payment-api"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Eventos aguardando publicação no outbox"
+          description: "O outbox do Payment mantém {{ $value }} evento(s) sem confirmação de publicação."
+
+      - alert: OutboxPaymentAtrasado
+        expr: payment_outbox_oldest_pending_seconds{job="payment-api"} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Evento de pagamento aguardando há mais de 1 minuto"
+          description: "O relay não publicou eventos pendentes; verifique broker, conectividade e tentativas."
+
+      - alert: ReciboNaDlq
+        expr: rabbitmq_detailed_queue_messages{queue="payment.receipt.dlq"} > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Há mensagens na DLQ de comprovantes"
+          description: "A fila {{ $labels.queue }} contém mensagens que precisam de análise e redrive controlado."

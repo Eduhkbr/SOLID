@@ -40,7 +40,7 @@ class PaymentServiceImplTest {
 
         assertThat(result).isEqualTo(payment);
         verify(repository, times(1)).save(payment);
-        verify(publisher, times(1)).publishPaymentProcessedEvent(payment);
+        verify(publisher, times(1)).publishPaymentStateChangedEvent(payment);
     }
 
     @Test
@@ -55,6 +55,7 @@ class PaymentServiceImplTest {
         assertThat(refunded.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(repository, times(1)).findById(id);
         verify(repository, times(1)).save(refunded);
+        verify(publisher, times(1)).publishPaymentStateChangedEvent(refunded);
     }
 
     @Test

@@ -10,6 +10,8 @@ datasources:
     editable: true
     jsonData:
       httpMethod: POST
+      manageAlerts: true
+      alertmanagerUid: alertmanager
       exemplarTraceIdDestinations:
         - name: traceID
           datasourceUid: tempo
@@ -24,11 +26,11 @@ datasources:
       maxLines: 1000
       derivedFields:
         - datasourceUid: tempo
-          matcherRegex: '"traceId"\s*:\s*"(\w+)"'
+          matcherRegex: '"trace_id"\s*:\s*"([0-9a-fA-F]+)"'
           name: TraceID
           url: "$${__value.raw}"
         - datasourceUid: tempo
-          matcherRegex: 'traceId=(\w+)'
+          matcherRegex: 'trace_id=([0-9a-fA-F]+)'
           name: TraceID
           url: "$${__value.raw}"
 
@@ -41,12 +43,11 @@ datasources:
     jsonData:
       tracesToLogsV2:
         datasourceUid: loki
-        spanStartTimeShift: "-1h"
-        spanEndTimeShift: "1h"
-        filterByTraceID: true
+        spanStartTimeShift: "-2s"
+        spanEndTimeShift: "2s"
         filterBySpanID: false
         customQuery: true
-        query: '{service="$${__span.tags.service.name}"} | json'
+        query: '{service="$${__span.tags.service.name}"} | json | trace_id="$${__trace.traceId}"'
       tracesToMetrics:
         datasourceUid: prometheus
         spanStartTimeShift: "-1h"
@@ -62,3 +63,12 @@ datasources:
         enabled: true
       lokiSearch:
         datasourceUid: loki
+
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    uid: alertmanager
+    url: http://alertmanager:9093
+    editable: true
+    jsonData:
+      implementation: prometheus

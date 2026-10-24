@@ -42,7 +42,7 @@ Este projeto simula um sistema de pagamentos onde:
 - **grafana**: Visualiza métricas.
 - **alertmanager**: Gerencia alertas.
 - **postgres-exporter** e **rabbitmq-exporter**: Exportam métricas específicas.
-- **loki** e **promtail**: Gerenciam logs.
+- **loki** e **alloy**: Gerenciam logs.
 
 **Exercício 3:** Acesse http://localhost:9090/targets
 
@@ -59,7 +59,7 @@ Este projeto simula um sistema de pagamentos onde:
 2. payment-api → PostgreSQL + RabbitMQ.
 3. receipt-api ← RabbitMQ → PostgreSQL.
 4. Métricas → Prometheus → Alertmanager.
-5. Logs → Promtail → Loki → Grafana.
+5. Logs → Grafana Alloy → Loki → Grafana.
 
 **Diagrama Interativo:**
 ```
@@ -77,7 +77,7 @@ Usuário
    |   |         | 
  [Grafana]   [Loki]
                 |
-            [Promtail]
+       [Grafana Alloy]
 ```
 
 **Exercício 4:** Via postman faça uma chamada em um endpoint do payment-api e observe os logs no RabbitMQ (http://localhost:15672).
@@ -105,7 +105,7 @@ Loki centraliza logs para busca rápida.
 3. No topo da página, selecione a fonte de dados "Loki" (se não estiver selecionada).
 4. Clique em Add query, selecione em label filters "job" = "docker"
 5. Clique em "Run query" para executar e visualizar os logs.
-6. Se não aparecer nada, verifique se o Loki está rodando (`docker compose ps loki`) e se há logs recentes no container (`docker compose logs promtail`).
+6. Se não aparecer nada, verifique se o Loki está rodando (`docker compose ps loki`) e se há logs recentes no coletor (`docker compose logs alloy`).
 
 ## Benefícios e Desafios
 

@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # ================= STAGE 1: Build =================
 # Usa uma imagem completa do Maven e JDK para compilar o projeto.
 # Esta imagem é grande, mas será descartada no final.
@@ -11,13 +13,22 @@ WORKDIR /app
 COPY pom.xml .
 
 # Baixa todas as dependências do projeto.
-RUN mvn dependency:go-offline
+# BuildKit mantém as dependências em cache entre compilações.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress dependency:go-offline
 
 # Copia o restante do código-fonte.
 COPY src ./src
 
-# Compila o projeto e gera o arquivo .jar. O -DskipTests acelera o build.
-RUN mvn clean install -DskipTests
+# Compila o projeto, gera o arquivo .jar e executa os testes.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress clean verify
+
+
+# Baixa o OpenTelemetry Java Agent para instrumentação automática.
+# Faz o download em estágio isolado e valida seu SHA-256 fixo.
+FROM scratch AS otel-agent
+ADD --checksum=sha256:99a3bbd05d2ee93bcbd169de7814fa46c9dfdea61661deb806c09d0e1c288a85 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /opentelemetry-javaagent.jar
 
 
 # ================= STAGE 2: Runtime =================
@@ -32,7 +43,8 @@ RUN apt-get update && \
 
 # Cria um grupo e um usuário de sistema dedicados para a aplicação.
 # --system cria um usuário sem home directory
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+RUN groupadd --system appgroup && \
+    useradd --system --gid appgroup --home-dir /nonexistent appuser
 
 # Define o diretório de trabalho.
 WORKDIR /app
@@ -41,26 +53,24 @@ WORKDIR /app
 ARG JAR_FILE=target/*.jar
 
 # Copia o .jar gerado no STAGE 1 para a imagem final.
-COPY --from=build /app/${JAR_FILE} app.jar
+COPY --from=build --chown=appuser:appgroup /app/${JAR_FILE} /app/app.jar
 
-# Copia o OpenTelemetry Java Agent para a imagem (certifique-se de baixar o .jar para o diretório do Dockerfile)
-COPY opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
+# Copia o agente OpenTelemetry verificado para a imagem final.
+COPY --from=otel-agent --chown=appuser:appgroup /opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 
 # Configura a variável de ambiente para ativar o agent
 ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
 
 # Define a propriedade do diretório e do arquivo para o novo usuário.
 # Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
-RUN chown -R appuser:appgroup /app
-
 # Muda o contexto de execução para o usuário não-root.
 # A partir deste ponto, todos os comandos subsequentes serão executados como 'appuser'.
-USER appuser
+USER appuser:appgroup
 
 # Expõe a porta que a aplicação Spring Boot usa por padrão.
 EXPOSE 8082
 
 # Definição do ponto de entrada da aplicação
 # Executa JAR diretamente com Java
-# Permite passagem de argumentos JVM se necessário
+# Para opções da JVM, use JAVA_TOOL_OPTIONS.
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -67,7 +67,6 @@ public class PaymentMapper {
                 .status(payment.getStatus())
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
-                .isNew(true) // Força inserção para evitar SELECT desnecessário
                 .build();
     }
 

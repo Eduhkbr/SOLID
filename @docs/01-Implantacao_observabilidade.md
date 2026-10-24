@@ -11,7 +11,7 @@ Facilitam identificar tendências e anomalias.
 ## Componentes da Stack de Observabilidade
 - **Prometheus:** Coleta e armazena métricas de serviços.
 - **Loki:** Armazena e indexa logs de containers.
-- **Promtail:** Agente que coleta logs dos containers e envia para o Loki.
+- **Grafana Alloy:** Coleta logs dos containers, extrai campos estruturados e envia os registros ao Loki.
 - **Grafana:** Painel unificado para visualizar métricas, logs e rastreamentos.
 - **Alertmanager:** Gerencia alertas baseados em regras do Prometheus.
 - **Exporters:** Exportam métricas específicas (ex: postgres-exporter, rabbitmq-exporter).
@@ -21,7 +21,7 @@ Facilitam identificar tendências e anomalias.
 ### 1. Preparação do Ambiente
 - Instale Docker Desktop.
 - Clone o repositório do projeto.
-- Estruture os arquivos de configuração (docker-compose.yml, prometheus.yml, loki-config.yaml, promtail-config.yaml, etc).
+- Estruture os arquivos de configuração (docker-compose.yml, prometheus.yml, loki-config.yaml, alloy-config.alloy, etc).
 
 ### 2. Subindo a Stack
 ```bash
@@ -67,14 +67,14 @@ Resumo do ecossistema (caso de estudo)
 - nginx (balanceador): distribui tráfego entre instâncias.
 - Prometheus, Grafana, Alertmanager: observabilidade.
 - postgres-exporter, rabbitmq-exporter: exportadores de métricas específicas.
-- Loki + Promtail: agregação e busca de logs.
+- Loki + Grafana Alloy: agregação e busca de logs.
 
 Fluxo de dados (visão simplificada)
 1. Usuário → nginx-lb → payment-api ou receipt-api
 2. payment-api → Persiste em PostgreSQL + publica em RabbitMQ
 3. receipt-api ← consome RabbitMQ → persiste em PostgreSQL
 4. Prometheus coleta métricas via endpoints de cada serviço
-5. Logs são enviados por Promtail para o Loki e consultados no Grafana
+5. Logs são enviados por Grafana Alloy para o Loki e consultados no Grafana.
 
 Por que isso importa?
 - Microssserviços criam observabilidade distribuída: não basta logs locais; 
@@ -224,8 +224,8 @@ groups:
 
 Observação: ajuste as expressões (expr) e os nomes dos jobs conforme seus `scrape_configs` no `prometheus.yml`.
 
-6. Logs com Loki e Promtail
-- Use Promtail para enviar logs dos containers para o Loki.
+6. Logs com Loki e Grafana Alloy
+- Use Grafana Alloy para descobrir os containers do projeto, extrair os campos estruturados dos logs e enviá-los ao Loki.
 - No Grafana, configure Loki como data source e use a aba Explore para buscar logs por labels.
 
 Exercício prático (buscar logs no Grafana):
@@ -262,8 +262,8 @@ Exercício prático (buscar logs no Grafana):
 # Filtrar por nivel de log (extraido do JSON do logback)
 {service="payment-api"} | json | level="ERROR"
 
-# Buscar por traceId especifico nos logs
-{service="payment-api"} |~ "traceId"
+# Buscar por trace_id específico nos logs
+{service="payment-api"} | json | trace_id != ""
 
 # Contar erros por servico nos ultimos 5 minutos
 sum(count_over_time({service=~"payment-api|receipt-api"} |~ "(?i)error" [5m])) by (service)
@@ -330,7 +330,7 @@ prometheus/
   alertmanager.yml
   loki-config.yml
   prometheus.yml
-  promtail-config.yml
+  alloy-config.alloy
 ```
 
 9. Referências rápidas

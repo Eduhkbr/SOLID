@@ -5,7 +5,6 @@ import br.com.fiap.PaymentSolidApi.application.port.out.PaymentRepository;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.persistence.entity.PaymentJpaEntity;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.persistence.repository.jpa.PaymentJpaRepository;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.persistence.repository.mappers.PaymentMapper;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -22,15 +21,10 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     @Override
     public Payment save(Payment payment) {
         PaymentJpaEntity entity = PaymentMapper.toEntity(payment);
-        PaymentJpaEntity saved;
-        try {
-            saved = jpaRepository.save(entity);
-        } catch (DataIntegrityViolationException e) {
-            // Fallback para UPDATE: Se o INSERT falhar devido a chave duplicada,
-            // marcamos a entidade como "não nova" e tentamos salvar novamente (merge).
-            entity.setNew(false);
-            saved = jpaRepository.save(entity);
-        }
+        // O domínio atribui UUID antes da persistência; por isso, o ID não indica
+        // se o Spring Data deve inserir (persist) ou atualizar (merge) a entidade.
+        entity.setNew(!jpaRepository.existsById(entity.getId()));
+        PaymentJpaEntity saved = jpaRepository.save(entity);
         return PaymentMapper.toDomain(saved);
     }
 

@@ -1,0 +1,56 @@
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+discovery.relabel "logs" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "^(?:" + sys.env("COMPOSE_PROJECT_NAME") + ")$"
+    action        = "keep"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.logs.rules
+  forward_to    = [loki.process.application.receiver]
+}
+
+loki.process "application" {
+  stage.docker {}
+
+  stage.regex {
+    expression = ".* (?P<level>TRACE|DEBUG|INFO|WARN|ERROR) (?P<logger>[^ ]+) trace_id=(?P<trace_id>[0-9a-fA-F]+) span_id=(?P<span_id>[0-9a-fA-F]+) - (?P<message>.*)"
+  }
+
+  stage.labels {
+    values = {
+      level  = "level",
+      logger = "logger",
+    }
+  }
+
+  stage.structured_metadata {
+    values = {
+      trace_id = "trace_id",
+      span_id  = "span_id",
+    }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

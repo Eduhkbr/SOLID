@@ -17,6 +17,7 @@
     <properties>
         <java.version>21</java.version>
         <springdoc.version>2.3.0</springdoc.version>
+        <opentelemetry.version>1.38.0</opentelemetry.version>
         <jackson-databind-nullable.version>0.2.6</jackson-databind-nullable.version>
         <byte-buddy-agent.version>1.17.7</byte-buddy-agent.version>
         <lombok.version>1.18.38</lombok.version>
@@ -58,6 +59,11 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <version>${opentelemetry.version}</version>
+        </dependency>
 
         <!-- Development Tools -->
         <dependency>
@@ -83,6 +89,14 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
         <!-- Utilities -->
@@ -119,17 +133,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- OpenTelemetry: Instrumentação automática e exportação OTLP para Tempo -->
-        <dependency>
-            <groupId>io.opentelemetry.instrumentation</groupId>
-            <artifactId>opentelemetry-spring-boot-starter</artifactId>
-            <version>1.22.1-alpha</version>
-        </dependency>
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-exporter-otlp</artifactId>
-            <version>1.38.0</version>
-        </dependency>
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
@@ -235,6 +238,8 @@
                 <configuration>
                     <systemPropertyVariables>
                         <spring.profiles.active>test</spring.profiles.active>
+                        <spring.flyway.enabled>false</spring.flyway.enabled>
+                        <app.outbox.enabled>false</app.outbox.enabled>
                     </systemPropertyVariables>
                     <argLine>
                         ${argLine}

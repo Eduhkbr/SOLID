@@ -5,11 +5,18 @@
 # utilizando PostgreSQL, RabbitMQ, Nginx (load balancer) e dois microsserviços Java Spring Boot.
 # =========================
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # =========================
   # Serviço de Banco de Dados PostgreSQL
   # =========================
   postgres-payments:
+    logging: *default-logging
     image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
     container_name: postgres_payments  # Nome do container para fácil identificação
     environment:
@@ -31,6 +38,7 @@ services:
       start_period: 40s
 
   postgres-receipts:
+    logging: *default-logging
     image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
     container_name: postgres_receipts  # Nome do container para fácil identificação
     environment:
@@ -55,6 +63,7 @@ services:
   # Serviço de Mensageria RabbitMQ
   # =========================
   rabbitmq:
+    logging: *default-logging
     image: rabbitmq:4.1-management  # Imagem do RabbitMQ com interface de gerenciamento
     container_name: rabbitmq_broker
     networks:
@@ -64,7 +73,8 @@ services:
       - "5672:5672"    # Porta padrão do RabbitMQ
       - "15672:15672"  # Porta do painel de administração
     volumes:
-      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Shovel
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Management, Shovel e Prometheus
+      - rabbitmq_data:/var/lib/rabbitmq # Mantém os dados do broker após recriação do container
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}  # Usuário padrão, definido em .env
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}  # Senha padrão, definido em .env
@@ -79,6 +89,7 @@ services:
   # Load Balancer (Nginx)
   # =========================
   nginx-lb:
+    logging: *default-logging
     image: nginx:latest  # Imagem oficial do Nginx
     container_name: nginx_load_balancer
     ports:
@@ -98,6 +109,7 @@ services:
   # Microsserviço de Pagamentos
   # =========================
   payment-api:
+    logging: *default-logging
     # build local a partir do Dockerfile do projeto
     build:
       context: ./PaymentSolidApi  # Diretório do projeto Java
@@ -112,7 +124,6 @@ services:
       - payment-db-network  # Acesso ao PostgreSQL
       - payment-mq-network  # Acesso ao RabbitMQ
     environment:
-      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_payment-api_1
       - SERVER_PORT=8082  # Porta interna do serviço
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payments:5432/${POSTGRES_PAYMENTS_DB}  # URL do banco
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
@@ -122,9 +133,10 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
-      - OTEL_SERVICE_NAME=PaymentSolidApi
+      - OTEL_SERVICE_NAME=payment-api
     depends_on:
       postgres-payments:
         condition: service_healthy  # Só inicia após o banco estar pronto
@@ -141,6 +153,7 @@ services:
   # Microsserviço de Comprovantes
   # =========================
   receipt-api:
+    logging: *default-logging
     build:
       context: ./ReceiptApi
       dockerfile: Dockerfile
@@ -154,7 +167,6 @@ services:
       - receipt-db-network  # Acesso ao PostgreSQL
       - receipt-mq-network  # Acesso ao RabbitMQ
     environment:
-      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_receipt-api_1
       - SERVER_PORT=8083
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-receipts:5432/${POSTGRES_RECEIPTS_DB}
       - SPRING_RABBITMQ_HOST=rabbitmq
@@ -164,9 +176,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
-      - OTEL_SERVICE_NAME=ReceiptApi
+      - OTEL_SERVICE_NAME=receipt-api
     depends_on:
       postgres-receipts:
         condition: service_healthy
@@ -183,6 +196,7 @@ services:
   # Exporter do PostgreSQL (para Prometheus)
   # =========================
   postgres-exporter-payments:
+    logging: *default-logging
     image: quay.io/prometheuscommunity/postgres-exporter
     container_name: postgres_exporter_payments
     environment:
@@ -195,6 +209,7 @@ services:
       - "${POSTGRES_EXPORTER_PAYMENTS_PORT}:9187"
 
   postgres-exporter-receipts:
+    logging: *default-logging
     image: quay.io/prometheuscommunity/postgres-exporter
     container_name: postgres_exporter_receipts
     environment:
@@ -207,34 +222,21 @@ services:
       - "${POSTGRES_EXPORTER_RECEIPTS_PORT}:9187"
 
   # =========================
-  # Exporter do RabbitMQ (para Prometheus)
-  # =========================
-  rabbitmq-exporter:
-    image: kbudde/rabbitmq-exporter
-    container_name: rabbitmq_exporter
-    environment:
-      - RABBIT_URL=http://rabbitmq:15672
-      - RABBIT_USER=${RABBITMQ_USER}
-      - RABBIT_PASSWORD=${RABBITMQ_PASS}
-    depends_on:
-      - rabbitmq
-    networks:
-      - payment-mq-network
-      - receipt-mq-network
-    ports:
-      - "9419:9419"
-
-  # =========================
   # Prometheus (Coleta de Métricas)
   # =========================
   prometheus:
+    logging: *default-logging
     image: prom/prometheus:latest
     container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - ./prometheus/tests:/etc/prometheus/tests:ro
       - prometheus_data:/prometheus  # Volume dedicado para persistência dos dados do Prometheus
     networks:
       - payment-db-network
@@ -246,7 +248,8 @@ services:
   # Grafana
   # =========================
   grafana:
-    image: grafana/grafana:latest
+    logging: *default-logging
+    image: grafana/grafana:13.2.4
     container_name: grafana
     ports:
       - "3000:3000"
@@ -274,6 +277,7 @@ services:
   # Alertmanager (Gerenciamento de Alertas)
   # =========================
   alertmanager:
+    logging: *default-logging
     image: prom/alertmanager:latest
     container_name: alertmanager
     ports:
@@ -286,10 +290,22 @@ services:
       - payment-mq-network
       - receipt-mq-network
 
+  # Receiver local para comprovar agrupamento e notificações resolvidas.
+  alert-webhook-sink:
+    logging: *default-logging
+    image: python:3.13-alpine
+    command: ["python", "/app/alert_webhook_sink.py"]
+    volumes:
+      - ./scripts/alert_webhook_sink.py:/app/alert_webhook_sink.py:ro
+      - alert_notifications:/data
+    networks:
+      - payment-mq-network
+
   # =========================
   # Loki (Centralização de Logs)
   # =========================
   loki:
+    logging: *default-logging
     image: grafana/loki:3.4.2
     container_name: loki
     ports:
@@ -311,29 +327,37 @@ services:
       - receipt-mq-network
 
   # =========================
-  # Promtail (Coletor de Logs para o Loki)
+  # Grafana Alloy (coleta e processamento de logs dos containers)
   # =========================
-  promtail:
-    image: grafana/promtail:3.4.2
-    container_name: promtail
+  alloy:
+    logging: *default-logging
+    image: grafana/alloy:v1.21.2
+    container_name: grafana_alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
     volumes:
-      - /var/log:/var/log
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./prometheus/promtail-config.yaml:/etc/promtail/config.yaml
-    command: -config.file=/etc/promtail/config.yaml
+      - ./prometheus/alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    environment:
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-solid}
     networks:
       - payment-db-network
       - receipt-db-network
       - payment-mq-network
       - receipt-mq-network
     depends_on:
-      - loki
+      loki:
+        condition: service_healthy
 
   # =========================
   # Serviço de Tracing Tempo
   # =========================
   tempo:
+    logging: *default-logging
     image: grafana/tempo:2.4.1
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
@@ -357,6 +381,9 @@ volumes:
   prometheus_data:  # Volume para dados do Prometheus
   tempo_data:  # Volume para dados do Tempo
   loki_data:  # Volume para dados do Loki
+  rabbitmq_data:  # Estado persistente do RabbitMQ
+  alert_notifications: # Notificações locais para o laboratório de alertas
+  alloy_data: # Posições de leitura persistidas pelo Alloy
 
 # =========================
 # Redes customizadas para isolar e conectar serviços

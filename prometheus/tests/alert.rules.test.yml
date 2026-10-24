@@ -1,0 +1,94 @@
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: alerta-de-cpu-dispara-e-recupera-para-as-duas-replicas
+    interval: 1m
+    input_series:
+      - series: 'process_cpu_usage{job="payment-api",instance="payment-1"}'
+        values: '0.9+0x5 0'
+      - series: 'process_cpu_usage{job="payment-api",instance="payment-2"}'
+        values: '0.9+0x5 0'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: UsoCpuElevado
+        exp_alerts:
+          - exp_labels:
+              instance: payment-1
+              job: payment-api
+              severity: warning
+            exp_annotations:
+              summary: "Uso de CPU elevado (payment-api)"
+              description: "O uso de CPU esta acima de 80% por mais de 5 minutos."
+          - exp_labels:
+              instance: payment-2
+              job: payment-api
+              severity: warning
+            exp_annotations:
+              summary: "Uso de CPU elevado (payment-api)"
+              description: "O uso de CPU esta acima de 80% por mais de 5 minutos."
+      - eval_time: 7m
+        alertname: UsoCpuElevado
+        exp_alerts: []
+
+  - name: alerta-de-outbox-atrasado-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'payment_outbox_oldest_pending_seconds{job="payment-api",instance="payment-1"}'
+        values: '0 30 65 70 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OutboxPaymentAtrasado
+        exp_alerts:
+          - exp_labels:
+              instance: payment-1
+              job: payment-api
+              severity: critical
+            exp_annotations:
+              summary: "Evento de pagamento aguardando há mais de 1 minuto"
+              description: "O relay não publicou eventos pendentes; verifique broker, conectividade e tentativas."
+      - eval_time: 4m
+        alertname: OutboxPaymentAtrasado
+        exp_alerts: []
+
+  - name: alerta-da-dlq-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_detailed_queue_messages{queue="payment.receipt.dlq"}'
+        values: '0 1 1 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ReciboNaDlq
+        exp_alerts:
+          - exp_labels:
+              queue: payment.receipt.dlq
+              severity: warning
+            exp_annotations:
+              summary: "Há mensagens na DLQ de comprovantes"
+              description: "A fila payment.receipt.dlq contém mensagens que precisam de análise e redrive controlado."
+      - eval_time: 3m
+        alertname: ReciboNaDlq
+        exp_alerts: []
+
+  - name: rabbitmq-indisponivel-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'up{job="rabbitmq",instance="rabbitmq:15692"}'
+        values: '0 0 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: RabbitMQIndisponivel
+        exp_alerts:
+          - exp_labels:
+              instance: rabbitmq:15692
+              job: rabbitmq
+              service: rabbitmq
+              severity: critical
+            exp_annotations:
+              summary: "RabbitMQ indisponível para coleta de métricas"
+              description: "O endpoint Prometheus do RabbitMQ não responde em rabbitmq:15692 há mais de 30 segundos."
+      - eval_time: 2m
+        alertname: RabbitMQIndisponivel
+        exp_alerts: []

@@ -64,4 +64,3 @@ class PaymentJpaEntityTest {
         assertThat(e).isNotEqualTo(new Object());
     }
 }
-

@@ -10,4 +10,3 @@ class PaymentNotFoundExceptionTest {
         assertThat(ex.getMessage()).isEqualTo("Pagamento não encontrado para o id: 123");
     }
 }
-

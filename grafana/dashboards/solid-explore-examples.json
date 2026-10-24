@@ -1,0 +1,69 @@
+{
+  "uid": "solid-explore-examples",
+  "title": "SOLID - Explore: consultas de exemplo",
+  "tags": [
+    "solid",
+    "observability",
+    "explore",
+    "payment",
+    "receipt"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "editable": true,
+  "links": [
+    {
+      "title": "Prometheus — taxa HTTP por serviço",
+      "type": "link",
+      "url": "/explore?schemaVersion=1&panes=%7B%221%22%3A%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22sum%20by%20(job%2C%20uri%2C%20method)%20(rate(http_server_requests_seconds_count%7Bjob%3D~%5C%22payment-api%7Creceipt-api%5C%22%7D%5B5m%5D))%22%2C%22legendFormat%22%3A%22%7B%7Bjob%7D%7D%20%7B%7Bmethod%7D%7D%20%7B%7Buri%7D%7D%22%2C%22range%22%3Atrue%2C%22datasource%22%3A%7B%22uid%22%3A%22prometheus%22%2C%22type%22%3A%22prometheus%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1",
+      "icon": "external link",
+      "tooltip": "Prometheus — taxa HTTP por serviço",
+      "includeVars": false,
+      "keepTime": false,
+      "targetBlank": true
+    },
+    {
+      "title": "Loki — logs de Payment e Receipt",
+      "type": "link",
+      "url": "/explore?schemaVersion=1&panes=%7B%221%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bservice%3D~%5C%22payment-api%7Creceipt-api%5C%22%7D%20%7C%20json%22%2C%22queryType%22%3A%22range%22%2C%22maxLines%22%3A1000%2C%22datasource%22%3A%7B%22uid%22%3A%22loki%22%2C%22type%22%3A%22loki%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1",
+      "icon": "external link",
+      "tooltip": "Loki — logs de Payment e Receipt",
+      "includeVars": false,
+      "keepTime": false,
+      "targetBlank": true
+    },
+    {
+      "title": "Tempo — traces de Payment",
+      "type": "link",
+      "url": "/explore?schemaVersion=1&panes=%7B%221%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22query%22%3A%22%7B%20resource.service.name%20%3D%20%5C%22payment-api%5C%22%20%7D%22%2C%22queryType%22%3A%22traceql%22%2C%22limit%22%3A20%2C%22datasource%22%3A%7B%22uid%22%3A%22tempo%22%2C%22type%22%3A%22tempo%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1",
+      "icon": "external link",
+      "tooltip": "Tempo — traces de Payment",
+      "includeVars": false,
+      "keepTime": false,
+      "targetBlank": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Como explorar a jornada Payment/Receipt",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Consultas para começar\n\nUse os atalhos no topo do dashboard para abrir cada consulta diretamente no **Explore**. O intervalo inicial é a última hora; gere uma transação Payment para produzir sinais recentes.\n\n- **Prometheus:** taxa de requisições HTTP por serviço e endpoint.\n- **Loki:** logs de Payment e Receipt em formato JSON.\n- **Tempo:** traces recebidos do serviço Payment via OpenTelemetry.\n\nNo Explore, ajuste o intervalo, execute a consulta e use os campos/labels para restringir a investigação. A partir dos logs, siga o `trace_id` até o trace correspondente no Tempo."
+      }
+    }
+  ]
+}
