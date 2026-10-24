@@ -27,6 +27,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public Payment create(Payment payment) {
         logger.info("Iniciando criação de pagamento: {}", payment);
         Payment savedPayment = paymentRepository.save(payment);

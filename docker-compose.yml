@@ -250,6 +250,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - ./prometheus/tests:/etc/prometheus/tests:ro
       - prometheus_data:/prometheus  # Volume dedicado para persistência dos dados do Prometheus
     networks:
       - payment-db-network
@@ -302,6 +303,17 @@ services:
       - receipt-db-network
       - payment-mq-network
       - receipt-mq-network
+
+  # Receiver local para comprovar agrupamento e notificações resolvidas.
+  alert-webhook-sink:
+    logging: *default-logging
+    image: python:3.13-alpine
+    command: ["python", "/app/alert_webhook_sink.py"]
+    volumes:
+      - ./scripts/alert_webhook_sink.py:/app/alert_webhook_sink.py:ro
+      - alert_notifications:/data
+    networks:
+      - payment-mq-network
 
   # =========================
   # Loki (Centralização de Logs)
@@ -378,6 +390,7 @@ volumes:
   tempo_data:  # Volume para dados do Tempo
   loki_data:  # Volume para dados do Loki
   rabbitmq_data:  # Estado persistente do RabbitMQ
+  alert_notifications: # Notificações locais para o laboratório de alertas
 
 # =========================
 # Redes customizadas para isolar e conectar serviços

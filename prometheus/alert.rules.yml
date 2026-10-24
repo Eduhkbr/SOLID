@@ -29,7 +29,7 @@ groups:
           severity: warning
         annotations:
           summary: "Pool de conexoes quase esgotado (payment-api)"
-          description: "Mais de 80% das conexoes do pool estao em uso ha 5 minutos."
+          description: "Mais de 80% das conexoes do pool de pagamentos estao em uso ha 1 minuto."
 
       - alert: ErroHttpElevado
         expr: sum(rate(http_server_requests_seconds_count{job="payment-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="payment-api"}[5m])) > 0.05
@@ -76,15 +76,6 @@ groups:
         annotations:
           summary: "Fila RabbitMQ com mais de 5 mensagens"
           description: "A fila RabbitMQ '{{ $labels.queue }}' esta acumulando mensagens."
-
-      - alert: PoolConexoesElevadoPayment
-        expr: hikaricp_connections_active{job="payment-api"} / hikaricp_connections_max{job="payment-api"} > 0.80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Pool de conexoes acima de 80% (payment-api)"
-          description: "Mais de 80% das conexoes do pool Hikari estao em uso ha 5 minutos."
 
       # Alertas para receipt-api
       - alert: ServicoIndisponivelReceipt
@@ -150,3 +141,30 @@ groups:
         annotations:
           summary: "Pool de conexoes acima de 80% (receipt-api)"
           description: "Mais de 80% das conexoes do pool Hikari estao em uso ha 5 minutos."
+
+      - alert: OutboxPaymentPendente
+        expr: payment_outbox_pending{job="payment-api"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Eventos aguardando publicação no outbox"
+          description: "O outbox do Payment mantém {{ $value }} evento(s) sem confirmação de publicação."
+
+      - alert: OutboxPaymentAtrasado
+        expr: payment_outbox_oldest_pending_seconds{job="payment-api"} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Evento de pagamento aguardando há mais de 1 minuto"
+          description: "O relay não publicou eventos pendentes; verifique broker, conectividade e tentativas."
+
+      - alert: ReciboNaDlq
+        expr: rabbitmq_queue_messages{queue="payment.receipt.dlq"} > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Há mensagens na DLQ de comprovantes"
+          description: "A fila {{ $labels.queue }} contém mensagens que precisam de análise e redrive controlado."

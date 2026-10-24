@@ -1,0 +1,34 @@
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: alerta-de-cpu-dispara-e-recupera-para-as-duas-replicas
+    interval: 1m
+    input_series:
+      - series: 'process_cpu_usage{job="payment-api",instance="payment-1"}'
+        values: '0.9+0x5 0'
+      - series: 'process_cpu_usage{job="payment-api",instance="payment-2"}'
+        values: '0.9+0x5 0'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: UsoCpuElevado
+        exp_alerts:
+          - exp_labels:
+              instance: payment-1
+              job: payment-api
+              severity: warning
+            exp_annotations:
+              summary: "Uso de CPU elevado (payment-api)"
+              description: "O uso de CPU esta acima de 80% por mais de 5 minutos."
+          - exp_labels:
+              instance: payment-2
+              job: payment-api
+              severity: warning
+            exp_annotations:
+              summary: "Uso de CPU elevado (payment-api)"
+              description: "O uso de CPU esta acima de 80% por mais de 5 minutos."
+      - eval_time: 7m
+        alertname: UsoCpuElevado
+        exp_alerts: []

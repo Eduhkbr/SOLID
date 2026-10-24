@@ -10,6 +10,8 @@ datasources:
     editable: true
     jsonData:
       httpMethod: POST
+      manageAlerts: true
+      alertmanagerUid: alertmanager
       exemplarTraceIdDestinations:
         - name: traceID
           datasourceUid: tempo
@@ -62,3 +64,12 @@ datasources:
         enabled: true
       lokiSearch:
         datasourceUid: loki
+
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    uid: alertmanager
+    url: http://alertmanager:9093
+    editable: true
+    jsonData:
+      implementation: prometheus

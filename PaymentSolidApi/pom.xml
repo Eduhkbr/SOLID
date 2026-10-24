@@ -84,6 +84,14 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
 
         <!-- Utilities -->
         <dependency>
@@ -235,6 +243,8 @@
                 <configuration>
                     <systemPropertyVariables>
                         <spring.profiles.active>test</spring.profiles.active>
+                        <spring.flyway.enabled>false</spring.flyway.enabled>
+                        <app.outbox.enabled>false</app.outbox.enabled>
                     </systemPropertyVariables>
                     <argLine>
                         ${argLine}

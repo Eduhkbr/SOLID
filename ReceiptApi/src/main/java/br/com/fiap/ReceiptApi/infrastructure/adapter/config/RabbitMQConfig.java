@@ -8,7 +8,9 @@ import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
+import org.springframework.amqp.rabbit.retry.RepublishMessageRecovererWithConfirms;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,10 +95,13 @@ public class RabbitMQConfig {
     @Bean
     public RetryOperationsInterceptor rabbitRetryInterceptor(RabbitTemplate rabbitTemplate) {
         // republish to DLX when retries are exhausted
-        RepublishMessageRecoverer recoverer = new RepublishMessageRecoverer(rabbitTemplate, paymentDlxExchange, receiptDlqRoutingKey);
+        RepublishMessageRecoverer recoverer = new RepublishMessageRecovererWithConfirms(
+                rabbitTemplate, paymentDlxExchange, receiptDlqRoutingKey,
+                CachingConnectionFactory.ConfirmType.CORRELATED);
 
         return RetryInterceptorBuilder.stateless()
                 .maxAttempts(3)
+                .backOffOptions(1000, 2.0, 10000)
                 .recoverer(recoverer)
                 .build();
     }
