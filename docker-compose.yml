@@ -268,7 +268,7 @@ services:
   # =========================
   grafana:
     logging: *default-logging
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.2.4
     container_name: grafana
     ports:
       - "3000:3000"
