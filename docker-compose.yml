@@ -5,11 +5,18 @@
 # utilizando PostgreSQL, RabbitMQ, Nginx (load balancer) e dois microsserviços Java Spring Boot.
 # =========================
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # =========================
   # Serviço de Banco de Dados PostgreSQL
   # =========================
   postgres-payments:
+    logging: *default-logging
     image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
     container_name: postgres_payments  # Nome do container para fácil identificação
     environment:
@@ -31,6 +38,7 @@ services:
       start_period: 40s
 
   postgres-receipts:
+    logging: *default-logging
     image: postgres:17  # Usa a imagem oficial do PostgreSQL versão 17
     container_name: postgres_receipts  # Nome do container para fácil identificação
     environment:
@@ -55,6 +63,7 @@ services:
   # Serviço de Mensageria RabbitMQ
   # =========================
   rabbitmq:
+    logging: *default-logging
     image: rabbitmq:4.1-management  # Imagem do RabbitMQ com interface de gerenciamento
     container_name: rabbitmq_broker
     networks:
@@ -80,6 +89,7 @@ services:
   # Load Balancer (Nginx)
   # =========================
   nginx-lb:
+    logging: *default-logging
     image: nginx:latest  # Imagem oficial do Nginx
     container_name: nginx_load_balancer
     ports:
@@ -99,6 +109,7 @@ services:
   # Microsserviço de Pagamentos
   # =========================
   payment-api:
+    logging: *default-logging
     # build local a partir do Dockerfile do projeto
     build:
       context: ./PaymentSolidApi  # Diretório do projeto Java
@@ -142,6 +153,7 @@ services:
   # Microsserviço de Comprovantes
   # =========================
   receipt-api:
+    logging: *default-logging
     build:
       context: ./ReceiptApi
       dockerfile: Dockerfile
@@ -184,6 +196,7 @@ services:
   # Exporter do PostgreSQL (para Prometheus)
   # =========================
   postgres-exporter-payments:
+    logging: *default-logging
     image: quay.io/prometheuscommunity/postgres-exporter
     container_name: postgres_exporter_payments
     environment:
@@ -196,6 +209,7 @@ services:
       - "${POSTGRES_EXPORTER_PAYMENTS_PORT}:9187"
 
   postgres-exporter-receipts:
+    logging: *default-logging
     image: quay.io/prometheuscommunity/postgres-exporter
     container_name: postgres_exporter_receipts
     environment:
@@ -211,6 +225,7 @@ services:
   # Exporter do RabbitMQ (para Prometheus)
   # =========================
   rabbitmq-exporter:
+    logging: *default-logging
     image: kbudde/rabbitmq-exporter
     container_name: rabbitmq_exporter
     environment:
@@ -229,6 +244,7 @@ services:
   # Prometheus (Coleta de Métricas)
   # =========================
   prometheus:
+    logging: *default-logging
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
@@ -247,6 +263,7 @@ services:
   # Grafana
   # =========================
   grafana:
+    logging: *default-logging
     image: grafana/grafana:latest
     container_name: grafana
     ports:
@@ -275,6 +292,7 @@ services:
   # Alertmanager (Gerenciamento de Alertas)
   # =========================
   alertmanager:
+    logging: *default-logging
     image: prom/alertmanager:latest
     container_name: alertmanager
     ports:
@@ -291,6 +309,7 @@ services:
   # Loki (Centralização de Logs)
   # =========================
   loki:
+    logging: *default-logging
     image: grafana/loki:3.4.2
     container_name: loki
     ports:
@@ -315,6 +334,7 @@ services:
   # Promtail (Coletor de Logs para o Loki)
   # =========================
   promtail:
+    logging: *default-logging
     image: grafana/promtail:3.4.2
     container_name: promtail
     volumes:
@@ -335,6 +355,7 @@ services:
   # Serviço de Tracing Tempo
   # =========================
   tempo:
+    logging: *default-logging
     image: grafana/tempo:2.4.1
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]

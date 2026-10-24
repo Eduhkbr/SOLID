@@ -68,12 +68,12 @@ scrape_configs:
             logger: logger_name
             message: message
             thread: thread_name
-            traceId: traceId
-            spanId: spanId
+            trace_id: trace_id
+            span_id: span_id
       - labels:
           level:
           logger:
       # Trace e span IDs variam por operação: metadados evitam criar um stream Loki por ID.
       - structured_metadata:
-          traceId:
-          spanId:
+          trace_id:
+          span_id:

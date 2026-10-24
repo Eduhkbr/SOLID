@@ -1,64 +1,33 @@
-# ================= STAGE 1: Build =================
-# Usa uma imagem completa do Maven e JDK para compilar o projeto.
-# Esta imagem é grande, mas será descartada no final.
+# syntax=docker/dockerfile:1.7
 FROM maven:3.9-eclipse-temurin-21 AS build
-
-# Define o diretório de trabalho dentro do contêiner.
 WORKDIR /app
 
-# Copia o pom.xml primeiro para aproveitar o cache de camadas do Docker.
-# Se as dependências não mudarem, esta camada não será re-executada.
-COPY pom.xml .
+# Mantém dependências no cache do BuildKit entre compilações.
+COPY pom.xml ./
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress dependency:go-offline
 
-# Baixa todas as dependências do projeto.
-RUN mvn dependency:go-offline
-
-# Copia o restante do código-fonte.
 COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress clean verify
 
-# Compila o projeto e gera o arquivo .jar. O -DskipTests acelera o build.
-RUN mvn clean install -DskipTests
+# A versão é a usada pelo material da aula; o checksum impede baixar outro conteúdo.
+FROM scratch AS otel-agent
+ADD --checksum=sha256:99a3bbd05d2ee93bcbd169de7814fa46c9dfdea61661deb806c09d0e1c288a85 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /opentelemetry-javaagent.jar
 
-
-# ================= STAGE 2: Runtime =================
-# Usa uma imagem mínima, apenas com o Java Runtime Environment (JRE).
-# Isso torna a imagem final muito menor e mais segura.
 FROM eclipse-temurin:21-jre-jammy
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system appgroup \
+    && useradd --system --gid appgroup --home-dir /nonexistent appuser
 
-# Instala ferramentas mínimas necessárias para healthchecks (curl) e certificados
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
-# Cria um grupo e um usuário de sistema dedicados para a aplicação.
-# --system cria um usuário sem home directory
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
-
-# Define o diretório de trabalho.
 WORKDIR /app
-
-# Argumento para o nome do JAR, permitindo que seja reutilizável.
 ARG JAR_FILE=target/*.jar
+COPY --from=build --chown=appuser:appgroup /app/${JAR_FILE} /app/app.jar
+COPY --from=otel-agent --chown=appuser:appgroup /opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 
-# Copia o .jar gerado no STAGE 1 para a imagem final.
-COPY --from=build /app/${JAR_FILE} app.jar
-
-# Baixa o OpenTelemetry Java Agent para instrumentação automática
-ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
-
-# Configura a variável de ambiente para ativar o agent
 ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
-
-# Define a propriedade do diretório e do arquivo para o novo usuário.
-# Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
-RUN chown -R appuser:appgroup /app
-
-# Muda o contexto de execução para o usuário não-root.
-# A partir deste ponto, todos os comandos subsequentes serão executados como 'appuser'.
-USER appuser
-
-# Expõe a porta que a aplicação Spring Boot usa por padrão.
+USER appuser:appgroup
 EXPOSE 8083
-
-# Comando para executar a aplicação quando o contêiner iniciar.
 ENTRYPOINT ["java", "-jar", "app.jar"]
