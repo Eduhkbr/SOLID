@@ -25,8 +25,8 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn --batch-mode --no-transfer-progress clean verify
 
 
-# Baixa o agente OpenTelemetry em estágio isolado e valida seu SHA-256.
-# A versão e o checksum fixos tornam explícito o artefato externo utilizado.
+# Baixa o OpenTelemetry Java Agent para instrumentação automática.
+# Faz o download em estágio isolado e valida seu SHA-256 fixo.
 FROM scratch AS otel-agent
 ADD --checksum=sha256:99a3bbd05d2ee93bcbd169de7814fa46c9dfdea61661deb806c09d0e1c288a85 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /opentelemetry-javaagent.jar
 
