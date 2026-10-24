@@ -25,15 +25,16 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn --batch-mode --no-transfer-progress clean verify
 
 
-# Baixa o agente OpenTelemetry em estágio isolado e valida seu SHA-256.
-# A versão e o checksum fixos tornam explícito o artefato externo utilizado.
+# Baixa o OpenTelemetry Java Agent para instrumentação automática.
+# Faz o download em estágio isolado e valida seu SHA-256 fixo.
 FROM scratch AS otel-agent
 ADD --checksum=sha256:99a3bbd05d2ee93bcbd169de7814fa46c9dfdea61661deb806c09d0e1c288a85 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.4.0/opentelemetry-javaagent.jar /opentelemetry-javaagent.jar
 
 
 # ================= STAGE 2: Runtime =================
 # Usa uma imagem mínima, apenas com o Java Runtime Environment (JRE).
-# Isso torna a imagem final muito menor e mais segura removendo ferramentas de build.
+# Isso torna a imagem final muito menor e mais segura.
+# O estágio de runtime não inclui as ferramentas de build.
 FROM eclipse-temurin:21-jre-jammy
 
 # Instala ferramentas mínimas necessárias para healthchecks (curl) e certificados
@@ -70,7 +71,7 @@ USER appuser:appgroup
 # Expõe a porta que a aplicação Spring Boot usa por padrão.
 EXPOSE 8083
 
-# Comando para executar o contêiner quando iniciar.
+# Comando para executar a aplicação quando o contêiner iniciar.
 # Executa JAR diretamente com Java
 # Para opções da JVM, use JAVA_TOOL_OPTIONS.
 ENTRYPOINT ["java", "-jar", "app.jar"]
