@@ -85,4 +85,3 @@ class PaymentMapperTest {
         assertThat(domain.getUpdatedAt()).isEqualTo(updated);
     }
 }
-

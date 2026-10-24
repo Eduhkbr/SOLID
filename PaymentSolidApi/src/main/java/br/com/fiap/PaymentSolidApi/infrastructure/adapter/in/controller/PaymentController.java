@@ -29,7 +29,7 @@ public class PaymentController implements PaymentsApi {
     // distinguir réplicas quando INSTANCE_ID não foi configurado.
     @Value("${INSTANCE_ID:${HOSTNAME:instancia-padrao}}")
     private String instanceId;
-    
+
     public PaymentController(PaymentService paymentService) {
         this.paymentService = paymentService;
     }
