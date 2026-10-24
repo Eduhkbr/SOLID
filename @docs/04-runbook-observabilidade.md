@@ -8,6 +8,8 @@ Suba a stack com `docker compose up -d --build` e confira `docker compose ps`. E
 
 Para consultar logs, use `docker compose logs --follow payment-api receipt-api rabbitmq`. Consulte um pagamento com `GET /api/payments/{id}` e seu comprovante com `GET /api/receipts/{paymentId}`. Métricas do outbox ficam em `GET /actuator/prometheus` no Payment.
 
+Grafana Alloy coleta apenas os containers do projeto Compose selecionado. O campo `service.name` dos traces usa `payment-api` e `receipt-api`, os mesmos nomes dos jobs no Prometheus e do label `service` no Loki.
+
 ## Outbox transacional e indisponibilidade do broker
 
 O Payment persiste o pagamento e o evento em `PAYMENT_OUTBOX` na mesma transação PostgreSQL. Um relay busca eventos pendentes com `FOR UPDATE SKIP LOCKED`, publica uma mensagem persistente, espera o publisher confirm e só então marca o evento como publicado. Falhas recebem novas tentativas com atraso exponencial e jitter.
@@ -40,6 +42,10 @@ O Prometheus avalia as regras em `prometheus/alert.rules.yml`. O Alertmanager ag
 
 O Grafana provisiona as fontes Prometheus e Alertmanager. Consulte alertas em **Alerting → Alert rules** e grupos/estado em **Alerting → Alert groups**. O receiver `aula-webhook` é local e grava notificações firing e resolved em `alert_notifications`; não envia e-mail ou mensagens externas. Em produção, configure um receiver apropriado, autenticação, TLS e política de deduplicação.
 
+O Tempo envia ao Prometheus métricas de spans e de service graph. Depois de gerar uma requisição, consulte `traces_spanmetrics_calls_total` e `traces_service_graph_request_total`; o mapa de serviços só aparece após essas séries chegarem ao Prometheus.
+
+O Payment persiste o contexto W3C (`traceparent`) junto com o evento no outbox e o restaura ao publicar no RabbitMQ. Assim, o trace iniciado pela requisição HTTP também contém a publicação e o processamento pelo Receipt; os logs dos dois serviços podem ser filtrados pelo mesmo `trace_id`.
+
 Para validar regras antes de alterar a configuração:
 
 ```bash
@@ -47,14 +53,14 @@ docker compose exec prometheus promtool check rules /etc/prometheus/alert.rules.
 docker compose exec prometheus promtool test rules /etc/prometheus/tests/alert.rules.test.yml
 ```
 
-O segundo comando verifica que o alerta de CPU aparece depois do período `for` para as duas réplicas e desaparece quando a série normaliza. O Alertmanager agrupa as duas instâncias, envia firing após `group_wait` e envia resolved quando ambas recuperam.
+O segundo comando verifica que os alertas de CPU, outbox atrasado e DLQ aparecem depois dos períodos `for` e desaparecem quando as séries normalizam. O Alertmanager agrupa as duas instâncias, envia firing após `group_wait` e envia resolved quando ambas recuperam.
 
 ## Investigação e recuperação
 
 1. Identifique o alerta e o serviço/instância afetados no Grafana.
 2. Para backlog, compare `payment_outbox_pending` com `payment_outbox_oldest_pending_seconds`; verifique conectividade e confirmações do RabbitMQ.
 3. Para recibos ausentes, confirme mensagem na fila principal ou DLQ, retries e registros em `PROCESSED_EVENTS`.
-4. Correlacione logs com `traceId`/`spanId` quando a exportação de traces estiver ativa. Evite transformar IDs de alta cardinalidade em labels do Loki.
+4. No Grafana, abra um trace e use **Logs for this span** para filtrar o Loki pelo mesmo `trace_id`; no Explore do Loki, use o link do campo `trace_id` para retornar ao trace no Tempo. `trace_id` e `span_id` são metadados estruturados, nunca labels indexadas.
 5. Depois de restaurar o serviço, observe a redução do backlog e o alerta resolved; registre a causa e os dados que sustentam o diagnóstico.
 
 `docker compose down` encerra os serviços e preserva os volumes. `docker compose down -v` também apaga dados persistidos; use apenas quando o objetivo for reinicializar explicitamente este laboratório.

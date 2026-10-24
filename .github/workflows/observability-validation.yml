@@ -1,0 +1,39 @@
+name: Validar observabilidade
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validar configurações e regras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar modelo do Compose
+        env:
+          POSTGRES_USER: review
+          POSTGRES_PASSWORD: review
+          POSTGRES_PAYMENTS_DB: payments
+          POSTGRES_RECEIPTS_DB: receipts
+          POSTGRES_PAYMENTS_PORT: '15432'
+          POSTGRES_RECEIPTS_PORT: '15433'
+          POSTGRES_EXPORTER_PAYMENTS_PORT: '19187'
+          POSTGRES_EXPORTER_RECEIPTS_PORT: '19188'
+          RABBITMQ_USER: review
+          RABBITMQ_PASS: review
+        run: docker compose -p observability-ci config --quiet
+
+      - name: Validar regras e testes Prometheus
+        run: |
+          docker run --rm --entrypoint /bin/promtool -v "$GITHUB_WORKSPACE/prometheus:/etc/prometheus:ro" prom/prometheus:latest check rules /etc/prometheus/alert.rules.yml
+          docker run --rm --entrypoint /bin/promtool -v "$GITHUB_WORKSPACE/prometheus:/etc/prometheus:ro" prom/prometheus:latest test rules /etc/prometheus/tests/alert.rules.test.yml
+
+      - name: Validar configuração Grafana Alloy
+        env:
+          COMPOSE_PROJECT_NAME: observability-ci
+        run: docker run --rm -e COMPOSE_PROJECT_NAME -v "$GITHUB_WORKSPACE/prometheus/alloy-config.alloy:/etc/alloy/config.alloy:ro" grafana/alloy:v1.21.2 validate /etc/alloy/config.alloy

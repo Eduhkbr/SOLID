@@ -32,3 +32,42 @@ tests:
       - eval_time: 7m
         alertname: UsoCpuElevado
         exp_alerts: []
+
+  - name: alerta-de-outbox-atrasado-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'payment_outbox_oldest_pending_seconds{job="payment-api",instance="payment-1"}'
+        values: '0 30 65 70 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OutboxPaymentAtrasado
+        exp_alerts:
+          - exp_labels:
+              instance: payment-1
+              job: payment-api
+              severity: critical
+            exp_annotations:
+              summary: "Evento de pagamento aguardando há mais de 1 minuto"
+              description: "O relay não publicou eventos pendentes; verifique broker, conectividade e tentativas."
+      - eval_time: 4m
+        alertname: OutboxPaymentAtrasado
+        exp_alerts: []
+
+  - name: alerta-da-dlq-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_queue_messages{queue="payment.receipt.dlq"}'
+        values: '0 1 1 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ReciboNaDlq
+        exp_alerts:
+          - exp_labels:
+              queue: payment.receipt.dlq
+              severity: warning
+            exp_annotations:
+              summary: "Há mensagens na DLQ de comprovantes"
+              description: "A fila payment.receipt.dlq contém mensagens que precisam de análise e redrive controlado."
+      - eval_time: 3m
+        alertname: ReciboNaDlq
+        exp_alerts: []

@@ -35,10 +35,12 @@ public class PaymentOutboxRepository {
                     ATTEMPT_COUNT = ATTEMPT_COUNT + 1
                 FROM candidates
                 WHERE event.EVENT_ID = candidates.EVENT_ID
-                RETURNING event.EVENT_ID, event.PAYLOAD::text, event.ATTEMPT_COUNT
+                RETURNING event.EVENT_ID, event.PAYLOAD::text,
+                          event.TRACE_CONTEXT::text AS trace_context, event.ATTEMPT_COUNT
                 """, (result, row) -> new OutboxMessage(
                 result.getObject("EVENT_ID", UUID.class),
                 result.getString("PAYLOAD"),
+                result.getString("trace_context"),
                 result.getInt("ATTEMPT_COUNT")), batchSize);
     }
 

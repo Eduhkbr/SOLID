@@ -88,15 +88,6 @@ groups:
           summary: "Instancia do receipt-api indisponivel"
           description: "O servico receipt-api esta fora do ar ha mais de 1 minuto."
 
-      - alert: PoolConexoesExauridoReceipt
-        expr: hikaricp_connections_active{job="receipt-api"} / hikaricp_connections_max{job="receipt-api"} > 0.80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Pool de conexoes quase esgotado (receipt-api)"
-          description: "Mais de 80% das conexoes do pool do receipt-api estao em uso."
-
       - alert: ErroHttpElevadoReceipt
         expr: sum(rate(http_server_requests_seconds_count{job="receipt-api",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="receipt-api"}[5m])) > 0.05
         for: 5m

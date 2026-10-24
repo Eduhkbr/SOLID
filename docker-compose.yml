@@ -133,9 +133,10 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
-      - OTEL_SERVICE_NAME=PaymentSolidApi
+      - OTEL_SERVICE_NAME=payment-api
     depends_on:
       postgres-payments:
         condition: service_healthy  # Só inicia após o banco estar pronto
@@ -175,9 +176,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
-      - OTEL_SERVICE_NAME=ReceiptApi
+      - OTEL_SERVICE_NAME=receipt-api
     depends_on:
       postgres-receipts:
         condition: service_healthy
@@ -245,6 +247,9 @@ services:
     logging: *default-logging
     image: prom/prometheus:latest
     container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
     ports:
       - "9090:9090"
     volumes:
@@ -341,25 +346,31 @@ services:
       - receipt-mq-network
 
   # =========================
-  # Promtail (Coletor de Logs para o Loki)
+  # Grafana Alloy (coleta e processamento de logs dos containers)
   # =========================
-  promtail:
+  alloy:
     logging: *default-logging
-    image: grafana/promtail:3.4.2
-    container_name: promtail
+    image: grafana/alloy:v1.21.2
+    container_name: grafana_alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
     volumes:
-      - /var/log:/var/log
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./prometheus/promtail-config.yaml:/etc/promtail/config.yaml
-    command: -config.file=/etc/promtail/config.yaml
+      - ./prometheus/alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    environment:
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-solid}
     networks:
       - payment-db-network
       - receipt-db-network
       - payment-mq-network
       - receipt-mq-network
     depends_on:
-      - loki
+      loki:
+        condition: service_healthy
 
   # =========================
   # Serviço de Tracing Tempo
@@ -391,6 +402,7 @@ volumes:
   loki_data:  # Volume para dados do Loki
   rabbitmq_data:  # Estado persistente do RabbitMQ
   alert_notifications: # Notificações locais para o laboratório de alertas
+  alloy_data: # Posições de leitura persistidas pelo Alloy
 
 # =========================
 # Redes customizadas para isolar e conectar serviços

@@ -17,6 +17,20 @@ storage:
     local:
       path: /tmp/tempo
 
+metrics_generator:
+  storage:
+    path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - span-metrics
+        - service-graphs
+
 compactor:
   compaction:
     block_retention: 10m
