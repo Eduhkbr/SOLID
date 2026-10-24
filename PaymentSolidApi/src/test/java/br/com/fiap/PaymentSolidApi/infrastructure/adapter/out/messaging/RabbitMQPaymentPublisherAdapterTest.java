@@ -26,26 +26,26 @@ class RabbitMQPaymentPublisherAdapterTest {
     }
 
     @Test
-    void publishPaymentProcessedEvent_sendsMessage() {
+    void publishPaymentStateChangedEvent_sendsMessage() {
         Payment payment = Mockito.mock(Payment.class);
         when(payment.getId()).thenReturn(UUID.randomUUID());
         when(payment.getAmount()).thenReturn(new BigDecimal("10.00"));
         when(payment.getPaymentMethod()).thenReturn(Payment.PaymentMethod.PIX);
         when(payment.getStatus()).thenReturn(PaymentStatus.PENDING);
         doNothing().when(rabbitTemplate).convertAndSend(any(String.class), any(String.class), any(PaymentProcessedEventDTO.class));
-        adapter.publishPaymentProcessedEvent(payment);
+        adapter.publishPaymentStateChangedEvent(payment);
         verify(rabbitTemplate, times(1)).convertAndSend(any(String.class), any(String.class), any(PaymentProcessedEventDTO.class));
     }
 
     @Test
-    void publishPaymentProcessedEvent_handlesException() {
+    void publishPaymentStateChangedEvent_handlesException() {
         Payment payment = Mockito.mock(Payment.class);
         when(payment.getId()).thenReturn(UUID.randomUUID());
         when(payment.getAmount()).thenReturn(new BigDecimal("10.00"));
         when(payment.getPaymentMethod()).thenReturn(Payment.PaymentMethod.PIX);
         when(payment.getStatus()).thenReturn(PaymentStatus.PENDING);
         doThrow(new RuntimeException("erro")).when(rabbitTemplate).convertAndSend(any(String.class), any(String.class), any(PaymentProcessedEventDTO.class));
-        assertThatThrownBy(() -> adapter.publishPaymentProcessedEvent(payment))
+        assertThatThrownBy(() -> adapter.publishPaymentStateChangedEvent(payment))
             .isInstanceOf(RuntimeException.class)
             .hasMessageContaining("erro");
         verify(rabbitTemplate, times(1)).convertAndSend(any(String.class), any(String.class), any(PaymentProcessedEventDTO.class));

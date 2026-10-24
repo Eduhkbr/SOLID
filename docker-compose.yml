@@ -124,7 +124,6 @@ services:
       - payment-db-network  # Acesso ao PostgreSQL
       - payment-mq-network  # Acesso ao RabbitMQ
     environment:
-      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_payment-api_1
       - SERVER_PORT=8082  # Porta interna do serviço
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payments:5432/${POSTGRES_PAYMENTS_DB}  # URL do banco
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
@@ -167,7 +166,6 @@ services:
       - receipt-db-network  # Acesso ao PostgreSQL
       - receipt-mq-network  # Acesso ao RabbitMQ
     environment:
-      - INSTANCE_ID=${COMPOSE_PROJECT_NAME}_receipt-api_1
       - SERVER_PORT=8083
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-receipts:5432/${POSTGRES_RECEIPTS_DB}
       - SPRING_RABBITMQ_HOST=rabbitmq

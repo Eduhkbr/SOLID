@@ -31,7 +31,7 @@ public class PaymentServiceImpl implements PaymentService {
         logger.info("Iniciando criação de pagamento: {}", payment);
         Payment savedPayment = paymentRepository.save(payment);
         logger.info("Pagamento criado com sucesso: {}", savedPayment.getId());
-        paymentEventPublisher.publishPaymentProcessedEvent(savedPayment);
+        paymentEventPublisher.publishPaymentStateChangedEvent(savedPayment);
         return savedPayment;
     }
 
@@ -55,6 +55,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new PaymentNotFoundException(id.toString()));
         payment.refund();
         Payment refunded = paymentRepository.save(payment);
+        paymentEventPublisher.publishPaymentStateChangedEvent(refunded);
         logger.info("Pagamento estornado com sucesso: {}", id);
         return refunded;
     }

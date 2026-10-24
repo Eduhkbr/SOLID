@@ -25,9 +25,9 @@ public class PaymentController implements PaymentsApi {
 
     private final PaymentService paymentService;
 
-    // Injeta o valor da variável de ambiente 'INSTANCE_ID'.
-    // Se não for definida, usa 'instancia-padrao'.
-    @Value("${INSTANCE_ID:instancia-padrao}")
+    // Prefere um identificador explícito; em contêiner, usa HOSTNAME para
+    // distinguir réplicas quando INSTANCE_ID não foi configurado.
+    @Value("${INSTANCE_ID:${HOSTNAME:instancia-padrao}}")
     private String instanceId;
     
     public PaymentController(PaymentService paymentService) {

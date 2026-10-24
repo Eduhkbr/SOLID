@@ -27,6 +27,7 @@ public class PaymentProcessedEventDTO implements Serializable {
     private String paymentMethod;
     private BigDecimal amount;
     private String status;
+    private LocalDateTime createdAt;
     private LocalDateTime processedAt;
 
     /**
@@ -39,6 +40,7 @@ public class PaymentProcessedEventDTO implements Serializable {
         this.paymentMethod = payment.getPaymentMethod().name();
         this.amount = payment.getAmount();
         this.status = payment.getStatus().name();
+        this.createdAt = payment.getCreatedAt();
         this.processedAt = payment.getUpdatedAt();
     }
 }
