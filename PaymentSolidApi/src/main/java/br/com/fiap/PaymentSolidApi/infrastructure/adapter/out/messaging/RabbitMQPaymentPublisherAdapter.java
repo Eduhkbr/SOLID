@@ -23,7 +23,7 @@ public class RabbitMQPaymentPublisherAdapter implements PaymentEventPublisherPor
     }
 
     @Override
-    public void publishPaymentProcessedEvent(Payment payment) {
+    public void publishPaymentStateChangedEvent(Payment payment) {
         // 1. Converte o objeto de domínio para o DTO do evento.
         PaymentProcessedEventDTO eventDTO = new PaymentProcessedEventDTO(payment);
 

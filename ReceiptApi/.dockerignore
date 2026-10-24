@@ -1,13 +1,41 @@
-# Build context is ReceiptApi. Exclude generated artifacts from that context.
+# O contexto do build é ReceiptApi. O target do outro serviço fica fora deste
+# contexto e não deve ser enviado ao daemon Docker.
+
+# Ignora saídas geradas pelo Maven para não enviá-las ao daemon Docker.
 /target/
 **/target/
+
+# A imagem usa Maven já instalado; o wrapper não é necessário no contexto.
+.mvn/
+mvnw
+mvnw.cmd
+
+# Metadados Git não participam da compilação da imagem.
 .git/
 **/.git/
+.gitignore
+.gitattributes
+
+# Configurações locais de IDE não fazem parte da aplicação.
 .idea/
 **/.idea/
+*.iml
+*.iws
+.settings/
+.project
+.classpath
 .vscode/
 **/.vscode/
-*.iml
+
+# Logs locais e arquivos do sistema operacional.
 *.log
+npm-debug.log
 .DS_Store
 Thumbs.db
+
+# Arquivos de instrução e configuração do Docker não são necessários no
+# contexto usado para compilar este módulo.
+README.md
+Dockerfile
+.dockerignore
+docker-compose.yml

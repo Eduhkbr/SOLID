@@ -1,0 +1,54 @@
+package br.com.fiap.ReceiptApi.application.service;
+
+import br.com.fiap.ReceiptApi.application.port.out.ReceiptRepository;
+import br.com.fiap.ReceiptApi.domain.factory.ReceiptFactory;
+import br.com.fiap.ReceiptApi.domain.model.Receipt;
+import br.com.fiap.ReceiptApi.domain.vo.PaymentVO;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+class ReceiptServiceImplTest {
+
+    @Test
+    void duplicatePaymentEventDoesNotCreateAnotherReceipt() {
+        ReceiptRepository repository = mock(ReceiptRepository.class);
+        ReceiptFactory factory = mock(ReceiptFactory.class);
+        ReceiptServiceImpl service = new ReceiptServiceImpl(repository, factory);
+        UUID paymentId = UUID.randomUUID();
+        PaymentVO payment = payment(paymentId);
+        when(repository.findByPaymentId(paymentId)).thenReturn(Optional.of(new Receipt()));
+
+        service.createReceiptFromPaymentInfo(payment);
+
+        verify(repository, never()).create(any());
+        verifyNoInteractions(factory);
+    }
+
+    @Test
+    void newPaymentEventCreatesReceipt() {
+        ReceiptRepository repository = mock(ReceiptRepository.class);
+        ReceiptFactory factory = mock(ReceiptFactory.class);
+        ReceiptServiceImpl service = new ReceiptServiceImpl(repository, factory);
+        UUID paymentId = UUID.randomUUID();
+        PaymentVO payment = payment(paymentId);
+        Receipt receipt = new Receipt(paymentId, "receipt", payment.createdAt());
+        when(repository.findByPaymentId(paymentId)).thenReturn(Optional.empty());
+        when(factory.createFromPayment(payment)).thenReturn(receipt);
+
+        service.createReceiptFromPaymentInfo(payment);
+
+        verify(repository).create(receipt);
+    }
+
+    private PaymentVO payment(UUID paymentId) {
+        LocalDateTime now = LocalDateTime.now();
+        return new PaymentVO(paymentId, "PIX", new BigDecimal("42.50"), "PENDING", now, now);
+    }
+}
