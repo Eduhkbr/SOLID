@@ -47,8 +47,29 @@ class ReceiptServiceImplTest {
         verify(repository).create(receipt);
     }
 
+    @Test
+    void refundEventArrivingBeforePaymentEventCreatesFinalReceiptState() {
+        ReceiptRepository repository = mock(ReceiptRepository.class);
+        ReceiptFactory factory = new ReceiptFactory();
+        ReceiptServiceImpl service = new ReceiptServiceImpl(repository, factory);
+        UUID paymentId = UUID.randomUUID();
+        PaymentVO refundedPayment = payment(paymentId, "REFUNDED");
+        when(repository.findByPaymentId(paymentId)).thenReturn(Optional.empty());
+
+        service.updateForRefund(refundedPayment);
+
+        org.mockito.ArgumentCaptor<Receipt> receiptCaptor = org.mockito.ArgumentCaptor.forClass(Receipt.class);
+        verify(repository).create(receiptCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(receiptCaptor.getValue().getReceiptData())
+                .contains("Status: REFUNDED", "--- ESTORNO REALIZADO ---");
+    }
+
     private PaymentVO payment(UUID paymentId) {
+        return payment(paymentId, "PENDING");
+    }
+
+    private PaymentVO payment(UUID paymentId, String status) {
         LocalDateTime now = LocalDateTime.now();
-        return new PaymentVO(paymentId, "PIX", new BigDecimal("42.50"), "PENDING", now, now);
+        return new PaymentVO(paymentId, "CREDIT_CARD", new BigDecimal("42.50"), status, now, now);
     }
 }
