@@ -3,7 +3,7 @@ name: SonarQube
 on:
   push:
     branches:
-      - feat/lb
+      - '**'
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
