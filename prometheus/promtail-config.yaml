@@ -73,5 +73,7 @@ scrape_configs:
       - labels:
           level:
           logger:
+      # Trace e span IDs variam por operação: metadados evitam criar um stream Loki por ID.
+      - structured_metadata:
           traceId:
           spanId:

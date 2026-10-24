@@ -77,14 +77,14 @@ groups:
           summary: "Fila RabbitMQ com mais de 5 mensagens"
           description: "A fila RabbitMQ '{{ $labels.queue }}' esta acumulando mensagens."
 
-      - alert: BancoConexaoLenta
-        expr: rate(jdbc_connections_active{job="payment-api"}[5m]) > 5
+      - alert: PoolConexoesElevadoPayment
+        expr: hikaricp_connections_active{job="payment-api"} / hikaricp_connections_max{job="payment-api"} > 0.80
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Taxa elevada de conexoes ativas ao banco (payment-api)"
-          description: "O numero de conexoes ativas ao banco esta acima do normal."
+          summary: "Pool de conexoes acima de 80% (payment-api)"
+          description: "Mais de 80% das conexoes do pool Hikari estao em uso ha 5 minutos."
 
       # Alertas para receipt-api
       - alert: ServicoIndisponivelReceipt
@@ -142,11 +142,11 @@ groups:
           summary: "Latencia P95 acima de 2s (receipt-api)"
           description: "O percentil 95 da latencia do receipt-api esta acima de 2 segundos."
 
-      - alert: BancoConexaoLentaReceipt
-        expr: rate(jdbc_connections_active{job="receipt-api"}[5m]) > 5
-        for: 1m
+      - alert: PoolConexoesElevadoReceipt
+        expr: hikaricp_connections_active{job="receipt-api"} / hikaricp_connections_max{job="receipt-api"} > 0.80
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Taxa elevada de conexoes ativas ao banco (receipt-api)"
-          description: "O numero de conexoes ativas ao banco do receipt-api esta acima do normal."
+          summary: "Pool de conexoes acima de 80% (receipt-api)"
+          description: "Mais de 80% das conexoes do pool Hikari estao em uso ha 5 minutos."

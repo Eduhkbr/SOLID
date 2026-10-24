@@ -65,6 +65,7 @@ services:
       - "15672:15672"  # Porta do painel de administração
     volumes:
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Shovel
+      - rabbitmq_data:/var/lib/rabbitmq # Mantém os dados do broker após recriação do container
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}  # Usuário padrão, definido em .env
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}  # Senha padrão, definido em .env
@@ -357,6 +358,7 @@ volumes:
   prometheus_data:  # Volume para dados do Prometheus
   tempo_data:  # Volume para dados do Tempo
   loki_data:  # Volume para dados do Loki
+  rabbitmq_data:  # Estado persistente do RabbitMQ
 
 # =========================
 # Redes customizadas para isolar e conectar serviços
