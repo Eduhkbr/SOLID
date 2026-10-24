@@ -1,58 +1,33 @@
-# ================= STAGE 1: Build =================
-# Usa uma imagem completa do Maven e JDK para compilar o projeto.
-# Esta imagem é grande, mas será descartada no final.
+# syntax=docker/dockerfile:1.7
+# ================= Estágio de build =================
 FROM maven:3.9-eclipse-temurin-21 AS build
-
-# Define o diretório de trabalho dentro do contêiner.
 WORKDIR /app
 
-# Copia o pom.xml primeiro para aproveitar o cache de camadas do Docker.
-# Se as dependências não mudarem, esta camada não será re-executada.
-COPY pom.xml .
+# Mantém o cache de dependências entre builds sem copiá-lo para a imagem final.
+COPY pom.xml ./
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress dependency:go-offline
 
-# Baixa todas as dependências do projeto.
-RUN mvn dependency:go-offline
-
-# Copia o restante do código-fonte.
 COPY src ./src
 
-# Compila o projeto e gera o arquivo .jar. O -DskipTests acelera o build.
-RUN mvn clean install -DskipTests
+# A imagem só é produzida depois que os testes do projeto passam.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn --batch-mode --no-transfer-progress clean verify
 
-
-# ================= STAGE 2: Runtime =================
-# Usa uma imagem mínima, apenas com o Java Runtime Environment (JRE).
-# Isso torna a imagem final muito menor e mais segura.
+# ================= Estágio de runtime =================
 FROM eclipse-temurin:21-jre-jammy
 
-# Instala o curl para que o healthcheck consiga chamar o actuator.
+# O Compose usa curl no healthcheck do Actuator.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system appgroup \
+    && useradd --system --gid appgroup --home-dir /nonexistent appuser
 
-# Cria um grupo e um usuário de sistema dedicados para a aplicação.
-# --system cria um usuário sem home directory
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
-
-# Define o diretório de trabalho.
 WORKDIR /app
-
-# Argumento para o nome do JAR, permitindo que seja reutilizável.
 ARG JAR_FILE=target/*.jar
+COPY --from=build --chown=appuser:appgroup /app/${JAR_FILE} /app/app.jar
 
-# Copia o .jar gerado no STAGE 1 para a imagem final.
-COPY --from=build /app/${JAR_FILE} app.jar
-
-# Define a propriedade do diretório e do arquivo para o novo usuário.
-# Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
-RUN chown -R appuser:appgroup /app
-
-# Muda o contexto de execução para o usuário não-root.
-# A partir deste ponto, todos os comandos subsequentes serão executados como 'appuser'.
-USER appuser
-
-# Expõe a porta que a aplicação Spring Boot usa por padrão.
+USER appuser:appgroup
 EXPOSE 8083
-
-# Comando para executar a aplicação quando o contêiner iniciar.
 ENTRYPOINT ["java", "-jar", "app.jar"]
