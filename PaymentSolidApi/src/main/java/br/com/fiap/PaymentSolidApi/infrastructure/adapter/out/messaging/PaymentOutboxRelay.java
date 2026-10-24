@@ -15,31 +15,55 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import io.micrometer.core.instrument.MeterRegistry;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 
 import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 @Component
 @ConditionalOnProperty(name = "app.outbox.enabled", havingValue = "true", matchIfMissing = true)
 public class PaymentOutboxRelay {
 
+    private static final TypeReference<Map<String, String>> TRACE_CONTEXT_TYPE = new TypeReference<>() { };
+    private static final TextMapGetter<Map<String, String>> TRACE_CONTEXT_GETTER = new TextMapGetter<>() {
+        @Override
+        public Iterable<String> keys(Map<String, String> carrier) {
+            return carrier.keySet();
+        }
+
+        @Override
+        public String get(Map<String, String> carrier, String key) {
+            return carrier.get(key);
+        }
+    };
+
     private static final Logger logger = LoggerFactory.getLogger(PaymentOutboxRelay.class);
     private final PaymentOutboxRepository outbox;
     private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
     private final String exchange;
     private final String routingKey;
     private final long confirmTimeoutMillis;
     private final io.micrometer.core.instrument.Counter publishFailures;
 
     public PaymentOutboxRelay(PaymentOutboxRepository outbox, RabbitTemplate rabbitTemplate,
+                              ObjectMapper objectMapper,
                               MeterRegistry meterRegistry,
                               @Value("${app.rabbitmq.exchange.payment}") String exchange,
                               @Value("${app.rabbitmq.routingkey.receipt}") String routingKey,
                               @Value("${app.outbox.confirm-timeout:5000}") long confirmTimeoutMillis) {
         this.outbox = outbox;
         this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
         this.exchange = exchange;
         this.routingKey = routingKey;
         this.confirmTimeoutMillis = confirmTimeoutMillis;
@@ -80,7 +104,10 @@ public class PaymentOutboxRelay {
                 .setMessageId(event.eventId().toString())
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .build();
-        rabbitTemplate.send(exchange, routingKey, message, correlation);
+        Context parentContext = extractTraceContext(event.traceContext());
+        try (Scope ignored = parentContext.makeCurrent()) {
+            rabbitTemplate.send(exchange, routingKey, message, correlation);
+        }
 
         CorrelationData.Confirm confirm = correlation.getFuture()
                 .get(confirmTimeoutMillis, TimeUnit.MILLISECONDS);
@@ -89,6 +116,20 @@ public class PaymentOutboxRelay {
         }
         if (correlation.getReturned() != null) {
             throw new IllegalStateException("RabbitMQ não encontrou uma fila para a mensagem publicada");
+        }
+    }
+
+    private Context extractTraceContext(String serializedTraceContext) {
+        if (serializedTraceContext == null || serializedTraceContext.isBlank()) {
+            return Context.root();
+        }
+        try {
+            Map<String, String> carrier = objectMapper.readValue(serializedTraceContext, TRACE_CONTEXT_TYPE);
+            return W3CTraceContextPropagator.getInstance().extract(Context.root(), carrier, TRACE_CONTEXT_GETTER);
+        } catch (JsonProcessingException exception) {
+            logger.warn("Contexto de trace inválido no outbox {}; publicação seguirá sem correlação.",
+                    serializedTraceContext, exception);
+            return Context.root();
         }
     }
 
