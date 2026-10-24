@@ -67,9 +67,20 @@ groups:
           summary: "Latencia P95 acima de 2s (payment-api)"
           description: "O percentil 95 da latencia esta acima de 2 segundos."
 
+      - alert: RabbitMQIndisponivel
+        # O scrape do endpoint nativo cobre indisponibilidade do broker ou do endpoint de métricas.
+        expr: up{job="rabbitmq"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ indisponível para coleta de métricas"
+          description: "O endpoint Prometheus do RabbitMQ não responde em {{ $labels.instance }} há mais de 30 segundos."
+
       - alert: RabbitMQFilaGrande
-        # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens
-        expr: rabbitmq_queue_messages{queue=~".*"} > 5
+        # Alerta quando filas RabbitMQ (qualquer fila) acumulam mais de 5 mensagens.
+        expr: rabbitmq_detailed_queue_messages{queue=~".*"} > 5
         for: 1m
         labels:
           severity: warning
@@ -152,7 +163,7 @@ groups:
           description: "O relay não publicou eventos pendentes; verifique broker, conectividade e tentativas."
 
       - alert: ReciboNaDlq
-        expr: rabbitmq_queue_messages{queue="payment.receipt.dlq"} > 0
+        expr: rabbitmq_detailed_queue_messages{queue="payment.receipt.dlq"} > 0
         for: 30s
         labels:
           severity: warning

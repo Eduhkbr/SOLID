@@ -56,7 +56,7 @@ tests:
   - name: alerta-da-dlq-dispara-e-recupera
     interval: 1m
     input_series:
-      - series: 'rabbitmq_queue_messages{queue="payment.receipt.dlq"}'
+      - series: 'rabbitmq_detailed_queue_messages{queue="payment.receipt.dlq"}'
         values: '0 1 1 0'
     alert_rule_test:
       - eval_time: 2m
@@ -70,4 +70,25 @@ tests:
               description: "A fila payment.receipt.dlq contém mensagens que precisam de análise e redrive controlado."
       - eval_time: 3m
         alertname: ReciboNaDlq
+        exp_alerts: []
+
+  - name: rabbitmq-indisponivel-dispara-e-recupera
+    interval: 1m
+    input_series:
+      - series: 'up{job="rabbitmq",instance="rabbitmq:15692"}'
+        values: '0 0 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: RabbitMQIndisponivel
+        exp_alerts:
+          - exp_labels:
+              instance: rabbitmq:15692
+              job: rabbitmq
+              service: rabbitmq
+              severity: critical
+            exp_annotations:
+              summary: "RabbitMQ indisponível para coleta de métricas"
+              description: "O endpoint Prometheus do RabbitMQ não responde em rabbitmq:15692 há mais de 30 segundos."
+      - eval_time: 2m
+        alertname: RabbitMQIndisponivel
         exp_alerts: []

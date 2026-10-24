@@ -73,7 +73,7 @@ services:
       - "5672:5672"    # Porta padrão do RabbitMQ
       - "15672:15672"  # Porta do painel de administração
     volumes:
-      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Shovel
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins # Habilita plugins Management, Shovel e Prometheus
       - rabbitmq_data:/var/lib/rabbitmq # Mantém os dados do broker após recriação do container
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}  # Usuário padrão, definido em .env
@@ -220,25 +220,6 @@ services:
       - receipt-db-network
     ports:
       - "${POSTGRES_EXPORTER_RECEIPTS_PORT}:9187"
-
-  # =========================
-  # Exporter do RabbitMQ (para Prometheus)
-  # =========================
-  rabbitmq-exporter:
-    logging: *default-logging
-    image: kbudde/rabbitmq-exporter
-    container_name: rabbitmq_exporter
-    environment:
-      - RABBIT_URL=http://rabbitmq:15672
-      - RABBIT_USER=${RABBITMQ_USER}
-      - RABBIT_PASSWORD=${RABBITMQ_PASS}
-    depends_on:
-      - rabbitmq
-    networks:
-      - payment-mq-network
-      - receipt-mq-network
-    ports:
-      - "9419:9419"
 
   # =========================
   # Prometheus (Coleta de Métricas)
