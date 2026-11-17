@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # BUILD: JDK e Maven compilam/testam; não entram na imagem final.
-# Tag facilita leitura; digest fixa conteúdo e exige atualização deliberada.
+# A tag é o nome legível da versão. O trecho @sha256:... é o digest:
+# um identificador calculado a partir do conteúdo da base, para fixar essa revisão.
 FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c AS build
 WORKDIR /app
 # POM antes do código preserva cache quando só uma classe muda.
@@ -27,9 +28,12 @@ RUN apt-get update \
 WORKDIR /app
 # Nome exato evita copiar JAR auxiliar por wildcard. Copiamos um JAR inteiro:
 # cache Maven, camadas OCI e camadas internas do JAR são mecanismos diferentes.
-COPY --from=build --chown=10001:10001 /app/target/PaymentSolidApi-0.0.1-SNAPSHOT.jar /app/app.jar
-# UID/GID fixos sem root. Compose remove capabilities e usa raiz read-only.
-USER 10001:10001
+COPY --from=build --chown=appuser:appgroup /app/target/PaymentSolidApi-0.0.1-SNAPSHOT.jar /app/app.jar
+# appuser é o usuário da aplicação; appgroup é seu grupo. Ambos foram criados
+# acima. UID e GID são os números usados pelo Linux para conferir permissões.
+# Fixamos os dois em 10001 para manter a identidade entre builds, sem usar root.
+# O nome torna a intenção legível. Compose também restringe escrita e privilégios.
+USER appuser:appgroup
 # EXPOSE só documenta; ports no Compose é que publica no host.
 EXPOSE 8082
 # Forma exec entrega SIGTERM ao Java (via init no Compose). Spring e prazo de

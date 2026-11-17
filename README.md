@@ -44,7 +44,9 @@ A criação retorna 201; a consulta do pagamento retorna 200 ou 404. Receipt ret
 
 Os Dockerfiles são comentados para leitura em aula. O estágio de build executa `mvn clean verify`; o runtime recebe somente o JAR explícito. O cache `.m2` do BuildKit não faz parte da imagem final. Copiar um JAR inteiro não equivale a extrair suas camadas internas.
 
-As APIs usam UID/GID 10001, raiz somente leitura, `/tmp` limitado, capabilities removidas, sem escalada de privilégios, limite de 768 MiB e 1 CPU por serviço. PostgreSQL e RabbitMQ também têm limites. Logs giram em três arquivos de até 10 MiB por serviço.
+As APIs executam com o usuário `appuser` e o grupo `appgroup`, criados no Dockerfile. O Linux usa os números UID e GID para verificar permissões; ambos são fixados em 10001. `USER appuser:appgroup` escolhe essa conta por nome e `COPY --chown=appuser:appgroup` atribui a ela o JAR. A suíte confere nomes, números e propriedade do arquivo nos dois serviços.
+
+As APIs usam raiz somente leitura, `/tmp` limitado, capabilities removidas, sem escalada de privilégios, limite de 768 MiB e 1 CPU por serviço. PostgreSQL e RabbitMQ também têm limites. Logs giram em três arquivos de até 10 MiB por serviço.
 
 `depends_on` com `service_healthy` coordena a subida inicial. Readiness de Payment inclui banco; a indisponibilidade do broker é absorvida pelo outbox. Readiness de Receipt inclui banco e broker. Liveness não depende deles. `unhealthy` sozinho não reinicia um contêiner automaticamente. O Spring recebe SIGTERM com prazo de parada compatível; saída 143 pode acompanhar um shutdown normal da JVM, devendo ser interpretada junto aos logs.
 

@@ -139,12 +139,19 @@ def isolation():
             for binding in mappings or []:
                 assert binding['HostIp'] == '127.0.0.1'
         if info['Config']['Labels']['com.docker.compose.service'].endswith('-api'):
-            assert info['Config']['User'] == '10001:10001'
+            assert info['Config']['User'] == 'appuser:appgroup'
             assert info['HostConfig']['ReadonlyRootfs']
             assert 'CAP_ALL' in info['HostConfig']['CapDrop'] or 'ALL' in info['HostConfig']['CapDrop']
             assert info['HostConfig']['LogConfig']['Config']['max-size'] == '10m'
     assert total_limits <= 8 * 1024**3
-    assert dc('exec', '-T', 'payment-api', 'id', '-u') == '10001'
+    # Configuração por nome e identidade efetiva precisam coincidir nos dois
+    # serviços. Ser apenas "diferente de root" não prova a conta escolhida.
+    for service in ('payment-api', 'receipt-api'):
+        assert dc('exec', '-T', service, 'id', '-un') == 'appuser'
+        assert dc('exec', '-T', service, 'id', '-gn') == 'appgroup'
+        assert dc('exec', '-T', service, 'id', '-u') == '10001'
+        assert dc('exec', '-T', service, 'id', '-g') == '10001'
+        assert dc('exec', '-T', service, 'stat', '-c', '%U:%G', '/app/app.jar') == 'appuser:appgroup'
     assert sql('paymentdb', "SELECT rolsuper FROM pg_roles WHERE rolname='payment_app'") == 'f'
     result = subprocess.run(compose + ['exec', '-T', '-e', 'PGPASSWORD='+env['PAYMENT_DB_PASSWORD'], 'postgres',
         'psql', '-h', 'localhost', '-U', env.get('PAYMENT_DB_USER','payment_app'), '-d', 'receiptdb', '-c', 'SELECT 1'], capture_output=True)
