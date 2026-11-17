@@ -23,6 +23,11 @@ function Invoke-Docker([string[]]$Arguments) {
 $existing = & docker ps -aq --filter "label=com.docker.compose.project=$Project"
 if ($LASTEXITCODE -ne 0) { throw 'Docker Engine inacessível. A suíte não pode ser aprovada sem executá-lo.' }
 if ($existing) { throw 'Já existem contêineres com esse projeto. Escolha outro identificador.' }
+$existingVolumes = & docker volume ls -q --filter "label=com.docker.compose.project=$Project"
+if ($LASTEXITCODE -ne 0) { throw 'Não foi possível conferir os volumes existentes.' }
+$existingNetworks = & docker network ls -q --filter "label=com.docker.compose.project=$Project"
+if ($LASTEXITCODE -ne 0) { throw 'Não foi possível conferir as redes existentes.' }
+if ($existingVolumes -or $existingNetworks) { throw 'Já existem volumes ou redes com esse projeto. Escolha outro identificador para preservar seus dados.' }
 try {
     Invoke-Docker ($base + @('config','--quiet'))
     if (-not $SkipBuild) {
@@ -39,7 +44,8 @@ try {
 } finally {
     if (-not $KeepResources) {
         # O nome exclusivo identifica exatamente os volumes descartáveis desta suíte.
-        & docker @testArgs down --volumes --remove-orphans
+        # Ativar o perfil também no down inclui seu volume Maven na limpeza.
+        Invoke-Docker ($testArgs + @('--profile','tests','down','--volumes','--remove-orphans'))
         if (-not $SkipBuild) { & docker image rm "aula-payment:$Project" "aula-receipt:$Project" }
     }
 }
