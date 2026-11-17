@@ -191,6 +191,9 @@ def http_contracts():
         assert status == 200 and 'Swagger UI' in html, (base, status)
     status, contract = request(payment_url + '/openapi.yml')
     assert status == 200 and 'openapi:' in contract
+    status, config = request(payment_url + '/v3/api-docs/swagger-config')
+    assert status == 200 and config['url'] == '/openapi.yml'
+    assert request(payment_url + '/v3/api-docs')[0] == 404
     status, contract = request(receipt_url + '/v3/api-docs')
     assert status == 200 and contract['openapi'].startswith('3.') and contract['paths']
     for method in ('BOLETO', 'PIX', 'CREDIT_CARD'):
