@@ -79,7 +79,7 @@ public class PaymentMapper {
         PaymentResponseDTO dto = new PaymentResponseDTO();
         dto.setPaymentId(payment.getId());
         dto.setAmount(payment.getAmount());
-        dto.setProcessedAt(payment.getCreatedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime());
+        dto.setProcessedAt(payment.getUpdatedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime());
         dto.setPaymentMethod(PaymentMethodEnum.valueOf(payment.getPaymentMethod().name()));
         dto.setStatus(StatusEnum.valueOf(payment.getStatus().name()));
 

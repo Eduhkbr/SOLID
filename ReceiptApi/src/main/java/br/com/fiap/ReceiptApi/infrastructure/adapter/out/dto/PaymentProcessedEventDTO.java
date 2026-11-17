@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * DTO que representa o evento de um pagamento processado.
  * Este é o contrato de dados que será enviado para a fila.
- * Implementa Serializable para garantir que possa ser convertido em bytes pela mensageria.
+ * O MessageConverter usa JSON; Serializable não é necessário para esse protocolo.
  */
 @Getter
 @Setter

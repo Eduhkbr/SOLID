@@ -106,7 +106,7 @@ paths:
       description: |
         Realiza o estorno de um pagamento.
         - **PIX:** Não permite estorno automático.
-        - **Boleto:** Precisa de cancelamento antes do vencimento.
+        - **Boleto:** Permite estorno enquanto PENDING neste simulador; não modela vencimento.
         - **Cartão de Crédito:** Permite estorno total.
       operationId: refundPayment
       parameters:
@@ -125,7 +125,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentResponseDTO'
-        '400':
+        '409':
           description: Pagamento não pode ser estornado (ex regra de negócio).
           content:
             application/json:
@@ -160,11 +160,8 @@ components:
       description: Status atual do pagamento
       enum:
         - PENDING
-        - PROCESSING
-        - APPROVED
-        - REJECTED
         - REFUNDED
-      example: "APPROVED"
+      example: "PENDING"
 
     PaymentRequestDTO:
       type: object
@@ -180,20 +177,25 @@ components:
           format: decimal
           description: Valor do pagamento
           minimum: 0.01
+          maximum: 99999999999999999.99
+          multipleOf: 0.01
           example: 150.75
         cardNumber:
           type: string
           description: 'Número do cartão de crédito (obrigatório se paymentMethod for CREDIT_CARD).'
           pattern: '^[0-9]{16}$'
+          writeOnly: true
           example: '1234567890123456'
         cvv:
           type: string
           description: 'CVV do cartão de crédito (obrigatório se paymentMethod for CREDIT_CARD).'
           pattern: '^[0-9]{3,4}$'
+          writeOnly: true
           example: '123'
         pixKey:
           type: string
           description: "Chave PIX (obrigatório se paymentMethod for PIX)."
+          maxLength: 254
           example: 'email@example.com'
 
     PaymentResponseDTO:
@@ -227,12 +229,12 @@ components:
     ErrorResponseDTO:
       type: object
       properties:
-        message:
+        error:
           type: string
-          description: Descrição do erro
-          example: "Pagamento não encontrado"
-        timestamp:
-          type: string
-          format: date-time
-          description: Data e hora em que o erro ocorreu
-          example: '2025-09-13T19:00:00Z'
+        details:
+          description: Detalhes de validação ou conflito de negócio; ausente em erros internos.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string

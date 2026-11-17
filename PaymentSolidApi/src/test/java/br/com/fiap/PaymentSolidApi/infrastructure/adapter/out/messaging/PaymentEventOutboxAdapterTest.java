@@ -2,8 +2,7 @@ package br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.messaging;
 
 import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.TraceFlags;
@@ -26,7 +25,7 @@ class PaymentEventOutboxAdapterTest {
     void storesAnIdentifiedVersionedEventInsteadOfPublishingImmediately() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         PaymentEventOutboxAdapter adapter = new PaymentEventOutboxAdapter(
-                jdbcTemplate, new ObjectMapper().registerModule(new JavaTimeModule()));
+                jdbcTemplate, JsonMapper.builder().build());
         Payment payment = mock(Payment.class);
         UUID paymentId = UUID.randomUUID();
         when(payment.getId()).thenReturn(paymentId);

@@ -1,18 +1,5 @@
-# Instruções de Inicialização da Aplicação
+# Payment API
 
-Este projeto utiliza **OpenAPI Codegen** para gerar automaticamente os contratos da API. Por conta disso, é necessário seguir uma ordem específica de execução antes de subir a aplicação.
+O laboratório e seus comandos vigentes estão no [guia da aula](../README.md). O build Docker executa geração OpenAPI e testes automaticamente; não é necessário um install manual anterior.
 
----
-
-## Etapas obrigatórias antes de subir a aplicação
-
-### 1. Rodar o `mvn clean install` com o perfil de teste
-
-Antes de iniciar a aplicação, é **obrigatório compilar o projeto** usando o perfil `test`. Isso garante que os arquivos gerados pelo OpenAPI Codegen estejam disponíveis e que o build seja concluído corretamente, sem exigir conexão com banco de dados.
-
-```bash
-mvn clean install -Dspring.profiles.active=test
-```
-
-### 2. Subir a aplicação
-Após a compilação bem-sucedida, você pode iniciar a aplicação desde que o Docker esteja rodando.
+Contrato: src/main/resources/api/openapi.yml. Flyway: src/main/resources/db/migration/. Testes unitários: mvn verify. Testes PostgreSQL: mvn verify -Pintegration, somente com as variáveis e banco descartável da suíte.

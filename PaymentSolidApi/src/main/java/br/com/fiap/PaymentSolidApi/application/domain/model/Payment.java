@@ -100,6 +100,4 @@ public class Payment {
     public String getCvv() { return cvv; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setStatus(PaymentStatus status) { this.status = status; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

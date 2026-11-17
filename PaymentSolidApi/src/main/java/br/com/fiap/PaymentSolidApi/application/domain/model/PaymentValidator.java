@@ -18,6 +18,13 @@ public class PaymentValidator {
             errors.add("Valor do pagamento é inválido.");
         }
 
+        // O banco usa NUMERIC(19,2): rejeitar frações e overflow antes de persistir,
+        // evitando que valor no evento e valor salvo sejam diferentes por arredondamento.
+        if (payment.getAmount() != null && (payment.getAmount().stripTrailingZeros().scale() > 2
+                || payment.getAmount().compareTo(new java.math.BigDecimal("99999999999999999.99")) > 0)) {
+            errors.add("Valor deve ter no máximo duas casas decimais e caber em NUMERIC(19,2).");
+        }
+
         if (payment.getPaymentMethod() == null) {
             errors.add("Tipo de pagamento é obrigatório.");
             throw new PaymentValidationException(errors);
@@ -38,7 +45,7 @@ public class PaymentValidator {
         if (payment.getCardNumber() == null || !payment.getCardNumber().matches("\\d{16}")) {
             errors.add("Número do cartão inválido.");
         }
-        if (payment.getCvv() == null || !payment.getCvv().matches("\\d{3}")) {
+        if (payment.getCvv() == null || !payment.getCvv().matches("\\d{3,4}")) {
             errors.add("CVV do cartão inválido.");
         }
         if (payment.getPixKey() != null && !payment.getPixKey().isBlank()) {
@@ -47,6 +54,12 @@ public class PaymentValidator {
     }
 
     private void validatePix(Payment payment, List<String> errors) {
+        if (payment.getCvv() != null && !payment.getCvv().isBlank()) {
+            errors.add("CVV não deve ser incluído para pagamento por PIX.");
+        }
+        if (payment.getPixKey() != null && payment.getPixKey().length() > 254) {
+            errors.add("Chave PIX deve ter no máximo 254 caracteres.");
+        }
         if (payment.getPixKey() == null || payment.getPixKey().isBlank()) {
             errors.add("Chave PIX é obrigatória.");
         }
@@ -56,6 +69,10 @@ public class PaymentValidator {
     }
 
     private void validateBoleto(Payment payment, List<String> errors) {
+        if ((payment.getCardNumber() != null && !payment.getCardNumber().isBlank())
+                || (payment.getCvv() != null && !payment.getCvv().isBlank())) {
+            errors.add("Dados de cartão não devem ser incluídos para pagamento por boleto.");
+        }
         if (payment.getPixKey() != null && !payment.getPixKey().isBlank()) {
             errors.add("Chave PIX não deve ser incluída para pagamento por boleto.");
         }

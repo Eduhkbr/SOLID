@@ -41,7 +41,7 @@ class PaymentJpaEntityTest {
                 .id(UUID.randomUUID())
                 .paymentMethod("PIX")
                 .amount(new BigDecimal("5"))
-                .status(PaymentStatus.APPROVED)
+                .status(PaymentStatus.PENDING)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -55,7 +55,7 @@ class PaymentJpaEntityTest {
                 .id(UUID.randomUUID())
                 .paymentMethod("BOLETO")
                 .amount(new BigDecimal("20"))
-                .status(PaymentStatus.REJECTED)
+                .status(PaymentStatus.REFUNDED)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();

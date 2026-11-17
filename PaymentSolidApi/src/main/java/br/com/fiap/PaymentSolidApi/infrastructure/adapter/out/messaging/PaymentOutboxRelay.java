@@ -15,9 +15,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import io.micrometer.core.instrument.MeterRegistry;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
@@ -49,14 +49,14 @@ public class PaymentOutboxRelay {
     private static final Logger logger = LoggerFactory.getLogger(PaymentOutboxRelay.class);
     private final PaymentOutboxRepository outbox;
     private final RabbitTemplate rabbitTemplate;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final String exchange;
     private final String routingKey;
     private final long confirmTimeoutMillis;
     private final io.micrometer.core.instrument.Counter publishFailures;
 
     public PaymentOutboxRelay(PaymentOutboxRepository outbox, RabbitTemplate rabbitTemplate,
-                              ObjectMapper objectMapper,
+                              JsonMapper objectMapper,
                               MeterRegistry meterRegistry,
                               @Value("${app.rabbitmq.exchange.payment}") String exchange,
                               @Value("${app.rabbitmq.routingkey.receipt}") String routingKey,
@@ -66,6 +66,9 @@ public class PaymentOutboxRelay {
         this.objectMapper = objectMapper;
         this.exchange = exchange;
         this.routingKey = routingKey;
+        if (confirmTimeoutMillis <= 0 || confirmTimeoutMillis > 10000) {
+            throw new IllegalArgumentException("Timeout de confirmação deve estar entre 1 e 10000 ms");
+        }
         this.confirmTimeoutMillis = confirmTimeoutMillis;
         this.publishFailures = meterRegistry.counter("payment.outbox.publish.failures");
         this.rabbitTemplate.setReturnsCallback(returned -> logger.warn(
@@ -82,15 +85,16 @@ public class PaymentOutboxRelay {
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-interval:1000}")
-    public void publishBatch() {
-        for (OutboxMessage message : outbox.claimBatch(10)) {
+    public synchronized void publishBatch() {
+        for (OutboxMessage message : outbox.claimBatch(1)) {
             try {
                 publish(message);
-                outbox.markPublished(message.eventId());
+                outbox.markPublished(message.eventId(), message.attemptCount());
             } catch (Exception exception) {
                 publishFailures.increment();
                 Duration delay = retryDelay(message.attemptCount());
-                outbox.scheduleRetry(message.eventId(), delay, exception.getMessage());
+                if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
+                outbox.scheduleRetry(message.eventId(), message.attemptCount(), delay, exception.getClass().getSimpleName());
                 logger.warn("Falha ao publicar evento {}. Nova tentativa em {} ms.",
                         message.eventId(), delay.toMillis());
             }
@@ -111,8 +115,8 @@ public class PaymentOutboxRelay {
 
         CorrelationData.Confirm confirm = correlation.getFuture()
                 .get(confirmTimeoutMillis, TimeUnit.MILLISECONDS);
-        if (!confirm.isAck()) {
-            throw new IllegalStateException("RabbitMQ rejeitou a publicação: " + confirm.getReason());
+        if (!confirm.ack()) {
+            throw new IllegalStateException("RabbitMQ rejeitou a publicação: " + confirm.reason());
         }
         if (correlation.getReturned() != null) {
             throw new IllegalStateException("RabbitMQ não encontrou uma fila para a mensagem publicada");
@@ -126,7 +130,7 @@ public class PaymentOutboxRelay {
         try {
             Map<String, String> carrier = objectMapper.readValue(serializedTraceContext, TRACE_CONTEXT_TYPE);
             return W3CTraceContextPropagator.getInstance().extract(Context.root(), carrier, TRACE_CONTEXT_GETTER);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             logger.warn("Contexto de trace inválido no outbox {}; publicação seguirá sem correlação.",
                     serializedTraceContext, exception);
             return Context.root();

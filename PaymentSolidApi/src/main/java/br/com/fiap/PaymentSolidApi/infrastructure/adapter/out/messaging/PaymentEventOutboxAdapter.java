@@ -4,8 +4,8 @@ import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
 import br.com.fiap.PaymentSolidApi.application.domain.model.Payment;
 import br.com.fiap.PaymentSolidApi.application.port.out.PaymentEventPublisherPort;
 import br.com.fiap.PaymentSolidApi.infrastructure.adapter.out.messaging.dto.PaymentProcessedEventDTO;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.TextMapSetter;
 import io.opentelemetry.context.Context;
@@ -23,9 +23,9 @@ public class PaymentEventOutboxAdapter implements PaymentEventPublisherPort {
     private static final TextMapSetter<Map<String, String>> TRACE_CONTEXT_SETTER = Map::put;
 
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
-    public PaymentEventOutboxAdapter(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public PaymentEventOutboxAdapter(JdbcTemplate jdbcTemplate, JsonMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
     }
@@ -46,7 +46,7 @@ public class PaymentEventOutboxAdapter implements PaymentEventPublisherPort {
                     VALUES (?, ?, ?, ?, CAST(? AS JSONB), CAST(? AS JSONB))
                     """, eventId, payment.getId(), aggregateVersion,
                     "PaymentStateChanged", payload, serializedTraceContext);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível serializar o evento de pagamento", exception);
         }
     }

@@ -45,16 +45,16 @@ public class PaymentOutboxRepository {
     }
 
     @Transactional
-    public void markPublished(UUID eventId) {
+    public void markPublished(UUID eventId, int attemptCount) {
         jdbcTemplate.update("""
                 UPDATE PAYMENT_OUTBOX
                 SET PUBLISHED_AT = CURRENT_TIMESTAMP, LOCKED_UNTIL = NULL, LAST_ERROR = NULL
-                WHERE EVENT_ID = ? AND PUBLISHED_AT IS NULL
-                """, eventId);
+                WHERE EVENT_ID = ? AND PUBLISHED_AT IS NULL AND ATTEMPT_COUNT = ?
+                """, eventId, attemptCount);
     }
 
     @Transactional
-    public void scheduleRetry(UUID eventId, Duration delay, String reason) {
+    public void scheduleRetry(UUID eventId, int attemptCount, Duration delay, String reason) {
         String safeReason = reason == null ? "Falha de publicação sem detalhe" : reason;
         if (safeReason.length() > 1000) safeReason = safeReason.substring(0, 1000);
         jdbcTemplate.update("""
@@ -62,8 +62,8 @@ public class PaymentOutboxRepository {
                 SET LOCKED_UNTIL = NULL,
                     NEXT_ATTEMPT_AT = CURRENT_TIMESTAMP + (? * INTERVAL '1 millisecond'),
                     LAST_ERROR = ?
-                WHERE EVENT_ID = ? AND PUBLISHED_AT IS NULL
-                """, delay.toMillis(), safeReason, eventId);
+                WHERE EVENT_ID = ? AND PUBLISHED_AT IS NULL AND ATTEMPT_COUNT = ?
+                """, delay.toMillis(), safeReason, eventId, attemptCount);
     }
 
     public long pendingCount() {

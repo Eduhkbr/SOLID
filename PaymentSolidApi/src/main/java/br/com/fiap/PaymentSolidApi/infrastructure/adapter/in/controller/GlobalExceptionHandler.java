@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
-        logger.warn("Erro de validação nos parâmetros: {} - detalhes: {}", ex.getClass().getSimpleName(), ex.getBindingResult().getFieldErrors().toString());
+        logger.warn("Erro de validação nos parâmetros: {}", ex.getClass().getSimpleName());
         Map<String, Object> error = new HashMap<>();
         error.put("error", "Erro de validação nos parâmetros");
         error.put("details", ex.getBindingResult().getFieldErrors().stream()
@@ -62,13 +62,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(error);
     }
 
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            jakarta.validation.ConstraintViolationException.class})
+    public ResponseEntity<Map<String, String>> handleInvalidRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Requisição inválida"));
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+        if (ex instanceof org.springframework.web.ErrorResponse errorResponse) {
+            return ResponseEntity.status(errorResponse.getStatusCode()).body(Map.of("error", "Requisição não atendida"));
+        }
         logger.error("Erro interno do servidor: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "Erro interno do servidor");
-        error.put("details", ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }

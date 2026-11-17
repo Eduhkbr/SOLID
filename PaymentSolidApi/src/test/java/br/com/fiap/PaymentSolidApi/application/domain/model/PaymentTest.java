@@ -51,12 +51,12 @@ class PaymentTest {
         UUID id = UUID.randomUUID();
         LocalDateTime created = LocalDateTime.now().minusDays(1);
         LocalDateTime updated = LocalDateTime.now();
-        Payment payment = Payment.fromState(id, Payment.PaymentMethod.BOLETO, new BigDecimal("20"), PaymentStatus.APPROVED, created, updated);
+        Payment payment = Payment.fromState(id, Payment.PaymentMethod.BOLETO, new BigDecimal("20"), PaymentStatus.PENDING, created, updated);
 
         assertThat(payment.getId()).isEqualTo(id);
         assertThat(payment.getPaymentMethod()).isEqualTo(Payment.PaymentMethod.BOLETO);
         assertThat(payment.getAmount()).isEqualByComparingTo(new BigDecimal("20"));
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getCreatedAt()).isEqualTo(created);
         assertThat(payment.getUpdatedAt()).isEqualTo(updated);
     }
@@ -83,7 +83,7 @@ class PaymentTest {
     @Test
     void refund_fail_when_status_not_pending() {
         Payment payment = Payment.create(Payment.PaymentMethod.CREDIT_CARD, new BigDecimal("100.00"), null, "1234567812345678", "123");
-        payment.setStatus(PaymentStatus.PROCESSING);
+        payment.refund();
 
         assertThatThrownBy(payment::refund)
                 .isInstanceOf(PaymentRefundException.class)

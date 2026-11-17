@@ -29,6 +29,12 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    public void lock(UUID id) {
+        // A transação do caso de uso mantém o lock até confirmar estado e outbox.
+        jpaRepository.findForUpdate(id);
+    }
+
+    @Override
     public Optional<Payment> findById(UUID id) {
         return jpaRepository.findById(id)
                 .map(PaymentMapper::toDomain);

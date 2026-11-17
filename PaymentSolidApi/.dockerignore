@@ -39,3 +39,11 @@ README.md
 Dockerfile
 .dockerignore
 docker-compose.yml
+
+# Segredos e cópias locais nunca participam do contexto.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks

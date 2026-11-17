@@ -58,12 +58,12 @@ class PaymentControllerTest {
     }
 
     @Test
-    void findPaymentById_returnsNoContent_whenNotFound() {
+    void findPaymentById_returnsNotFound_whenNotFound() {
         UUID id = UUID.randomUUID();
         when(paymentService.findById(id)).thenReturn(Optional.empty());
 
         ResponseEntity<PaymentResponseDTO> response = controller.findPaymentById(id);
-        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
         assertThat(response.getBody()).isNull();
     }
 }

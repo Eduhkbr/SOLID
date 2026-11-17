@@ -1,54 +1,36 @@
 # syntax=docker/dockerfile:1.7
-# ================= STAGE 1: Build =================
-# Usa Maven e JDK para compilar e testar o projeto. Este estágio é descartado
-# da imagem final, que contém apenas o runtime Java.
-FROM maven:3.9-eclipse-temurin-21 AS build
-
-# Define o diretório de trabalho dentro do contêiner.
+# BUILD: JDK e Maven compilam/testam; não entram na imagem final.
+# Tag facilita leitura; digest fixa conteúdo e exige atualização deliberada.
+FROM maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237 AS build
 WORKDIR /app
-
-# Copia o POM antes do código para reaproveitar as dependências quando o código
-# mudar sem alteração no arquivo de dependências.
+# POM antes do código preserva cache quando só uma classe muda.
+# Cache mount guarda .m2 no builder: não vira camada final nem é cofre de segredos.
+# sharing=locked evita disputa por .m2 em builds concorrentes.
 COPY pom.xml ./
-# BuildKit mantém o repositório Maven em cache entre builds, sem copiá-lo para a
-# imagem final.
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
     mvn --batch-mode --no-transfer-progress dependency:go-offline
-
-# Copia o código-fonte do serviço.
+# .dockerignore exclui target, credenciais e arquivos locais do contexto enviado.
 COPY src ./src
-
-# Compila o projeto, executa os testes e valida as verificações da fase verify.
-RUN --mount=type=cache,target=/root/.m2 \
+# verify executa testes unitários. Integração PostgreSQL é obrigatória na suíte
+# externa (-Pintegration), sem montar socket Docker dentro do build.
+RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
     mvn --batch-mode --no-transfer-progress clean verify
 
-# ================= STAGE 2: Runtime =================
-# A imagem final usa somente o Java Runtime Environment; as ferramentas de
-# build não são incluídas.
-FROM eclipse-temurin:21-jre-jammy
-
-# Instala o curl usado pelo healthcheck do Actuator e os certificados CA.
+# RUNTIME: JRE, certificados e curl utilizado no healthcheck; sem Maven/JDK.
+FROM eclipse-temurin:21-jre-jammy@sha256:dff6eb46527bd293a3c06bbbe9e64e8c9f91f01905b5abbdad31761c03059d2c
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system appgroup \
-    && useradd --system --gid appgroup --home-dir /nonexistent appuser
-
-# Define o diretório de trabalho.
+    && groupadd --system --gid 10001 appgroup \
+    && useradd --system --uid 10001 --gid appgroup --home-dir /nonexistent appuser
 WORKDIR /app
-
-# Argumento para permitir selecionar o JAR produzido pelo Maven.
-ARG JAR_FILE=target/*.jar
-
-# Copia somente o JAR da etapa de build e define a propriedade no próprio COPY.
-COPY --from=build --chown=appuser:appgroup /app/${JAR_FILE} /app/app.jar
-
-# Executa o processo com usuário sem privilégios.
-USER appuser:appgroup
-
-# Expõe a porta usada pela aplicação Spring Boot.
+# Nome exato evita copiar JAR auxiliar por wildcard. Copiamos um JAR inteiro:
+# cache Maven, camadas OCI e camadas internas do JAR são mecanismos diferentes.
+COPY --from=build --chown=10001:10001 /app/target/PaymentSolidApi-0.0.1-SNAPSHOT.jar /app/app.jar
+# UID/GID fixos sem root. Compose remove capabilities e usa raiz read-only.
+USER 10001:10001
+# EXPOSE só documenta; ports no Compose é que publica no host.
 EXPOSE 8082
-
-# Executa o JAR diretamente; opções adicionais da JVM podem ser passadas na
-# configuração do contêiner.
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Forma exec entrega SIGTERM ao Java (via init no Compose). Spring e prazo de
+# parada devem ser compatíveis. JAVA_TOOL_OPTIONS é lido automaticamente pela JVM.
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -52,6 +52,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public Payment refundPayment(UUID id) {
         logger.info("Iniciando estorno de pagamento: {}", id);
+        paymentRepository.lock(id);
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new PaymentNotFoundException(id.toString()));
         payment.refund();

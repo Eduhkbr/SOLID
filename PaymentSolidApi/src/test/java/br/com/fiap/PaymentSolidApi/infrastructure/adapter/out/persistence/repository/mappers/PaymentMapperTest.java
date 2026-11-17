@@ -70,7 +70,7 @@ class PaymentMapperTest {
                 .id(payment.getId())
                 .paymentMethod(payment.getPaymentMethod().name())
                 .amount(payment.getAmount())
-                .status(PaymentStatus.APPROVED)
+                .status(PaymentStatus.PENDING)
                 .createdAt(created)
                 .updatedAt(updated)
                 .build();
@@ -84,4 +84,12 @@ class PaymentMapperTest {
         assertThat(domain.getCreatedAt()).isEqualTo(created);
         assertThat(domain.getUpdatedAt()).isEqualTo(updated);
     }
+    @Test
+    void responseTimestampReflectsLatestTransition() {
+        LocalDateTime created=LocalDateTime.of(2026,1,1,12,0);
+        LocalDateTime updated=created.plusHours(1);
+        Payment payment=Payment.fromState(UUID.randomUUID(),Payment.PaymentMethod.BOLETO,new BigDecimal("42.50"),PaymentStatus.REFUNDED,created,updated);
+        assertThat(PaymentMapper.toResponseDto(payment).getProcessedAt().toLocalDateTime()).isEqualTo(updated);
+    }
+
 }
