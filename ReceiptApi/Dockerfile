@@ -19,6 +19,7 @@ RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
 # RUNTIME: JRE, certificados e curl utilizado no healthcheck; sem Maven/JDK.
 FROM eclipse-temurin:21-jre-jammy@sha256:dff6eb46527bd293a3c06bbbe9e64e8c9f91f01905b5abbdad31761c03059d2c
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 appgroup \

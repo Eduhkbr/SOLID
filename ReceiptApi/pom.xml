@@ -17,6 +17,8 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Correção de segurança compatível, posterior ao BOM desta versão Boot. -->
+        <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
