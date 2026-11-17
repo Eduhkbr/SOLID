@@ -15,7 +15,10 @@
     <description>API para processar e gerenciar pagamentos através de diferentes métodos (Cartão de Crédito, PIX, Boleto)</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
+        <argLine></argLine>
+        <!-- Agente explícito: Mockito não depende de autoanexação dinâmica. -->
+        <test.jvm.args>"-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar"</test.jvm.args>
         <!-- Correção de segurança compatível, posterior ao BOM desta versão Boot. -->
         <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
 
@@ -122,14 +125,7 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy-agent</artifactId>
-            <version>${byte-buddy.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
+<dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
             <version>9.0</version>
@@ -147,6 +143,17 @@
         </resources>
 
         <plugins>
+            <!-- Falha cedo se o Maven for iniciado com outro JDK. Sem preview. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.6.2</version>
+                <executions><execution><id>require-java-25</id><goals><goal>enforce</goal></goals>
+                    <configuration><rules><requireJavaVersion>
+                        <version>[25,26)</version><message>Execute o Maven com JDK 25.</message>
+                    </requireJavaVersion></rules></configuration>
+                </execution></executions>
+            </plugin>
             <!-- Lombok annotation processor -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -228,7 +235,7 @@
                 </executions>
             </plugin>
 
-            <!-- Surefire: carrega o Byte-Buddy Agent como Java Agent -->
+            <!-- Surefire: Mockito explícito e cobertura JaCoCo com avaliação tardia. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -239,12 +246,7 @@
 
 
                     </systemPropertyVariables>
-                    <argLine>
-                        ${argLine}
-                        --add-opens java.base/java.lang=ALL-UNNAMED
-                        --add-opens java.base/java.lang.reflect=ALL-UNNAMED
-                        -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar
-                    </argLine>
+                    <argLine>@{argLine} ${test.jvm.args}</argLine>
                 </configuration>
             </plugin>
 
@@ -304,6 +306,7 @@
                 <version>3.5.4</version>
                 <configuration>
                     <failIfNoTests>true</failIfNoTests>
+                    <argLine>@{argLine} ${test.jvm.args}</argLine>
                     <systemPropertyVariables><spring.profiles.active>integration</spring.profiles.active></systemPropertyVariables>
                 </configuration>
                 <executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>

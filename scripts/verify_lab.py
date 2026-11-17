@@ -9,6 +9,10 @@ import concurrent.futures
 import datetime
 import json
 import pathlib
+import io
+import re
+import tempfile
+import zipfile
 import subprocess
 import time
 import urllib.error
@@ -146,7 +150,49 @@ def isolation():
         'psql', '-h', 'localhost', '-U', env.get('PAYMENT_DB_USER','payment_app'), '-d', 'receiptdb', '-c', 'SELECT 1'], capture_output=True)
     assert result.returncode != 0, 'Papel Payment não pode acessar receiptdb'
 
+
+def java25_compatibility():
+    """Inspeciona a JVM e o JAR efetivamente em execução, não só o POM."""
+    evidence = []
+    for service in ('payment-api', 'receipt-api'):
+        version = dc('exec', '-T', service, 'java', '--version')
+        assert re.match(r'^(openjdk|java) 25(?:[.\s])', version), version
+        with tempfile.TemporaryDirectory(dir=args.evidence_dir) as temp:
+            jar_path = pathlib.Path(temp) / 'app.jar'
+            command(['docker', 'cp', dc('ps', '-q', service) + ':/app/app.jar', str(jar_path)])
+            own_classes = dependency_classes = 0
+            with zipfile.ZipFile(jar_path) as app:
+                for name in app.namelist():
+                    if name.startswith('BOOT-INF/classes/') and name.endswith('.class'):
+                        major = int.from_bytes(app.read(name)[6:8], 'big')
+                        assert major == 69, (service, name, major)
+                        own_classes += 1
+                    elif name.startswith('BOOT-INF/lib/') and name.endswith('.jar'):
+                        with zipfile.ZipFile(io.BytesIO(app.read(name))) as dependency:
+                            for entry in dependency.namelist():
+                                if not entry.endswith('.class'):
+                                    continue
+                                # Classes multi-release acima de 25 não são selecionadas
+                                # pela JVM 25. Todas as demais precisam ser carregáveis.
+                                mr = re.match(r'META-INF/versions/(\d+)/', entry)
+                                if mr and int(mr.group(1)) > 25:
+                                    continue
+                                major = int.from_bytes(dependency.read(entry)[6:8], 'big')
+                                assert major <= 69, (service, name, entry, major)
+                                dependency_classes += 1
+            assert own_classes and dependency_classes
+            evidence.append({'service': service, 'java': version, 'application_class_major': 69,
+                             'application_classes': own_classes, 'dependency_classes': dependency_classes})
+    (args.evidence_dir / 'java25.json').write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding='utf8')
+
 def http_contracts():
+    for base in (payment_url, receipt_url):
+        status, html = request(base + '/swagger-ui/index.html')
+        assert status == 200 and 'Swagger UI' in html, (base, status)
+    status, contract = request(payment_url + '/openapi.yml')
+    assert status == 200 and 'openapi:' in contract
+    status, contract = request(receipt_url + '/v3/api-docs')
+    assert status == 200 and contract['openapi'].startswith('3.') and contract['paths']
     for method in ('BOLETO', 'PIX', 'CREDIT_CARD'):
         payment_id = create(method)
         assert request(payment_url+'/api/payments/'+payment_id)[0] == 200
@@ -245,6 +291,7 @@ def graceful_stop():
     wait(lambda: request(payment_url+'/actuator/health/readiness')[0] == 200, description='retomada Payment')
 
 try:
+    record('JVM bytecode e dependências em Java 25', java25_compatibility)
     record('isolamento privilégios e limites', isolation)
     record('contratos HTTP e validação', http_contracts)
     record('broker indisponível e recuperação do outbox', broker_outage)

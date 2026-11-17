@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # BUILD: JDK e Maven compilam/testam; não entram na imagem final.
 # Tag facilita leitura; digest fixa conteúdo e exige atualização deliberada.
-FROM maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237 AS build
+FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c AS build
 WORKDIR /app
 # POM antes do código preserva cache quando só uma classe muda.
 # Cache mount guarda .m2 no builder: não vira camada final nem é cofre de segredos.
@@ -17,7 +17,7 @@ RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
     mvn --batch-mode --no-transfer-progress clean verify
 
 # RUNTIME: JRE, certificados e curl utilizado no healthcheck; sem Maven/JDK.
-FROM eclipse-temurin:21-jre-jammy@sha256:dff6eb46527bd293a3c06bbbe9e64e8c9f91f01905b5abbdad31761c03059d2c
+FROM eclipse-temurin:25-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl ca-certificates \

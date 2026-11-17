@@ -1,6 +1,6 @@
 # Conteinerização de aplicações Spring Boot
 
-Laboratório local da aula: Payment recebe pagamentos fictícios e Receipt produz comprovantes por eventos RabbitMQ. Java 21, Spring Boot 4.1.2, Jackson 3, PostgreSQL 17 e RabbitMQ 4.3.6. Não há integração financeira nem autenticação de usuários. Use somente dados fictícios e mantenha as portas restritas ao computador local.
+Laboratório local da aula: Payment recebe pagamentos fictícios e Receipt produz comprovantes por eventos RabbitMQ. Java 25, Spring Boot 4.1.2, Jackson 3, PostgreSQL 17 e RabbitMQ 4.3.6. Não há integração financeira nem autenticação de usuários. Use somente dados fictícios e mantenha as portas restritas ao computador local.
 
 ## Executar a aula
 
@@ -82,3 +82,14 @@ O workflow `Laboratório de conteinerização` executa a mesma suíte em PRs. So
 Tags/digests das imagens constam nos Dockerfiles e Compose. Revise versões e vulnerabilidades antes de cada oferta da aula; um digest fixa conteúdo, não certifica segurança. A análise de segurança precisa distinguir ocorrência de pacote, configuração vulnerável e exploração demonstrada. Não extrapole testes locais para desempenho, HA ou segurança de produção.
 
 Referências: [Dockerfile](https://docs.docker.com/reference/dockerfile/), [cache](https://docs.docker.com/build/cache/optimize/), [inicialização Compose](https://docs.docker.com/compose/how-tos/startup-order/), [volumes](https://docs.docker.com/engine/storage/volumes/), [migração Boot 4](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide), [Jackson no Boot](https://docs.spring.io/spring-boot/reference/features/json.html), [conversão JSON AMQP](https://docs.spring.io/spring-amqp/reference/amqp/message-converters.html).
+
+## Contrato Java 25
+
+Build, testes e runtime usam Java 25, sem recursos preview. Os dois POMs compilam
+com `--release 25` e o Enforcer recusa outro JDK na execução do Maven. Configure
+também o SDK da IDE e o `JAVA_HOME` se executar Maven fora dos contêineres.
+As bases JDK/JRE 25 são fixadas por digest. O runtime usa Ubuntu Noble.
+Lombok é processador explícito nos dois módulos; Mockito entra como agente nos
+testes unitários e de integração, sem depender de autoanexação dinâmica.
+O BOM Spring Boot controla as versões transitivas. A suíte verifica a JVM efetiva
+nas duas APIs, bytecode Java 25 e a jornada HTTP/OpenAPI/PostgreSQL/RabbitMQ.

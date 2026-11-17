@@ -1,7 +1,7 @@
 # Overlay usado somente pela suíte: runner Maven sem socket Docker e sem portas no host.
 services:
   payment-tests:
-    image: maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237
+    image: maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
     profiles: [tests]
     working_dir: /workspace
     volumes:
@@ -19,7 +19,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
   receipt-tests:
-    image: maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237
+    image: maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
     profiles: [tests]
     working_dir: /workspace
     volumes:
