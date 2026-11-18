@@ -24,3 +24,8 @@ compactor:
 querier:
   frontend_worker:
     frontend_address: 127.0.0.1:9095
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
