@@ -28,7 +28,10 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     @Override
     public void createReceiptFromPaymentInfo(PaymentVO vo) {
-        System.out.println("LOG: Gerando comprovante para o pagamento ID: " + vo.id());
+        if (receiptRepository.findByPaymentId(vo.id()).isPresent()) {
+            logger.info("Comprovante já existe para o pagamento {}; evento duplicado ignorado.", vo.id());
+            return;
+        }
 
         // Usa a factory para criar o objeto de domínio
         Receipt newReceipt = receiptFactory.createFromPayment(vo);
@@ -36,7 +39,7 @@ public class ReceiptServiceImpl implements ReceiptService {
         // Usa a porta de saída para persistir o objeto
         receiptRepository.create(newReceipt);
 
-        System.out.println("LOG: Comprovante para o pagamento ID " + vo.id() + " salvo com sucesso!");
+        logger.info("Comprovante para o pagamento ID {} salvo com sucesso.", vo.id());
     }
 
     @Override
@@ -54,7 +57,12 @@ public class ReceiptServiceImpl implements ReceiptService {
             receiptRepository.create(receipt);
             logger.info("Comprovante {} atualizado para refletir o estorno.", receipt.getPaymentId());
         } else {
-            logger.warn("Nenhum comprovante encontrado para o pagamento estornado {}. Nenhuma ação foi tomada.", refundedPaymentVO.id());
+            // As réplicas podem processar eventos adjacentes em paralelo. Se o
+            // estorno chegar antes da criação do comprovante, cria o estado final.
+            Receipt receipt = receiptFactory.createFromPayment(refundedPaymentVO);
+            receipt.updateForRefund(refundedPaymentVO);
+            receiptRepository.create(receipt);
+            logger.info("Comprovante {} criado a partir do evento de estorno.", receipt.getPaymentId());
         }
     }
 }

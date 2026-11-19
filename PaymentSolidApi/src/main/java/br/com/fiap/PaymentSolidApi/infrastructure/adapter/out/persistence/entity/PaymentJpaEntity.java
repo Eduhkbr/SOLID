@@ -6,12 +6,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 import br.com.fiap.PaymentSolidApi.application.domain.PaymentStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import org.springframework.data.domain.Persistable;
 import lombok.*;
 
 @Entity
@@ -21,7 +17,7 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentJpaEntity {
+public class PaymentJpaEntity implements Persistable<UUID> {
 
     @Id
     private UUID id;
@@ -41,6 +37,21 @@ public class PaymentJpaEntity {
 
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
+
+    @Transient
+    @Builder.Default
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
+    }
 
     // A implementação correta de equals e hashCode para entidades JPA
     // se baseia apenas no ID, garantindo consistência com o banco de dados.

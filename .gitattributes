@@ -1,0 +1,9 @@
+# Scripts e configurações precisam manter LF também em checkouts Windows.
+*.sh text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile* text eol=lf
+.dockerignore text eol=lf
+.env.example text eol=lf

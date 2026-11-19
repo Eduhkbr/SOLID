@@ -60,14 +60,14 @@ public class PaymentMapper {
     public static PaymentJpaEntity toEntity(Payment payment) {
         if (payment == null) return null;
 
-        return new PaymentJpaEntity(
-                payment.getId(),
-                payment.getPaymentMethod().name(),
-                payment.getAmount(),
-                payment.getStatus(),
-                payment.getCreatedAt(),
-                payment.getUpdatedAt()
-        );
+        return PaymentJpaEntity.builder()
+                .id(payment.getId())
+                .paymentMethod(payment.getPaymentMethod().name())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .createdAt(payment.getCreatedAt())
+                .updatedAt(payment.getUpdatedAt())
+                .build();
     }
 
     /**
@@ -79,7 +79,7 @@ public class PaymentMapper {
         PaymentResponseDTO dto = new PaymentResponseDTO();
         dto.setPaymentId(payment.getId());
         dto.setAmount(payment.getAmount());
-        dto.setProcessedAt(payment.getCreatedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime());
+        dto.setProcessedAt(payment.getUpdatedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime());
         dto.setPaymentMethod(PaymentMethodEnum.valueOf(payment.getPaymentMethod().name()));
         dto.setStatus(StatusEnum.valueOf(payment.getStatus().name()));
 

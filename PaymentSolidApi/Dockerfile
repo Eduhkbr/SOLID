@@ -1,60 +1,41 @@
-# ================= STAGE 1: Build =================
-# Usa uma imagem completa do Maven e JDK para compilar o projeto.
-# Esta imagem é grande, mas será descartada no final.
-FROM maven:3.9-eclipse-temurin-21 AS build
-
-# Define o diretório de trabalho dentro do contêiner.
+# syntax=docker/dockerfile:1.7
+# BUILD: JDK e Maven compilam/testam; não entram na imagem final.
+# A tag é o nome legível da versão. O trecho @sha256:... é o digest:
+# um identificador calculado a partir do conteúdo da base, para fixar essa revisão.
+FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c AS build
 WORKDIR /app
-
-# Copia o pom.xml primeiro para aproveitar o cache de camadas do Docker.
-# Se as dependências não mudarem, esta camada não será re-executada.
-COPY pom.xml .
-
-# Baixa todas as dependências do projeto.
-RUN mvn dependency:go-offline
-
-# Copia o restante do código-fonte.
+# POM antes do código preserva cache quando só uma classe muda.
+# Cache mount guarda .m2 no builder: não vira camada final nem é cofre de segredos.
+# sharing=locked evita disputa por .m2 em builds concorrentes.
+COPY pom.xml ./
+RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
+    mvn --batch-mode --no-transfer-progress dependency:go-offline
+# .dockerignore exclui target, credenciais e arquivos locais do contexto enviado.
 COPY src ./src
+# verify executa testes unitários. Integração PostgreSQL é obrigatória na suíte
+# externa (-Pintegration), sem montar socket Docker dentro do build.
+RUN --mount=type=cache,id=aula-maven,target=/root/.m2,sharing=locked \
+    mvn --batch-mode --no-transfer-progress clean verify
 
-# Compila o projeto e gera o arquivo .jar. O -DskipTests acelera o build.
-RUN mvn clean install -DskipTests
-
-
-# ================= STAGE 2: Runtime =================
-# Usa uma imagem mínima, apenas com o Java Runtime Environment (JRE).
-# Isso torna a imagem final muito menor e mais segura removendo ferramentas de build
-FROM eclipse-temurin:21-jre-jammy
-
-# Instala o curl para permitir que o healthcheck do contêiner acesse os endpoints do actuator.
+# RUNTIME: JRE, certificados e curl utilizado no healthcheck; sem Maven/JDK.
+FROM eclipse-temurin:25-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Cria um grupo e um usuário de sistema dedicados para a aplicação.
-# --system cria um usuário sem home directory
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
-
-# Define o diretório de trabalho.
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 appgroup \
+    && useradd --system --uid 10001 --gid appgroup --home-dir /nonexistent appuser
 WORKDIR /app
-
-# Argumento para o nome do JAR, permitindo que seja reutilizável.
-ARG JAR_FILE=target/*.jar
-
-# Copia o .jar gerado no STAGE 1 para a imagem final.
-COPY --from=build /app/${JAR_FILE} app.jar
-
-# Define a propriedade do diretório e do arquivo para o novo usuário.
-# Isso garante que o usuário 'appuser' tenha permissão para acessar os arquivos.
-RUN chown -R appuser:appgroup /app
-
-# Muda o contexto de execução para o usuário não-root.
-# A partir deste ponto, todos os comandos subsequentes serão executados como 'appuser'.
-USER appuser
-
-# Expõe a porta que a aplicação Spring Boot usa por padrão.
+# Nome exato evita copiar JAR auxiliar por wildcard. Copiamos um JAR inteiro:
+# cache Maven, camadas OCI e camadas internas do JAR são mecanismos diferentes.
+COPY --from=build --chown=appuser:appgroup /app/target/PaymentSolidApi-0.0.1-SNAPSHOT.jar /app/app.jar
+# appuser é o usuário da aplicação; appgroup é seu grupo. Ambos foram criados
+# acima. UID e GID são os números usados pelo Linux para conferir permissões.
+# Fixamos os dois em 10001 para manter a identidade entre builds, sem usar root.
+# O nome torna a intenção legível. Compose também restringe escrita e privilégios.
+USER appuser:appgroup
+# EXPOSE só documenta; ports no Compose é que publica no host.
 EXPOSE 8082
-
-# Definição do ponto de entrada da aplicação
-# Executa JAR diretamente com Java
-# Permite passagem de argumentos JVM se necessário
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Forma exec entrega SIGTERM ao Java (via init no Compose). Spring e prazo de
+# parada devem ser compatíveis. JAVA_TOOL_OPTIONS é lido automaticamente pela JVM.
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,10 +1,9 @@
 package br.com.fiap.PaymentSolidApi.infrastructure.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
 import org.springframework.amqp.core.Exchange;
 import org.springframework.amqp.core.ExchangeBuilder;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -27,13 +26,12 @@ public class RabbitMQConfig {
 
     /**
      * Configura o Spring para usar JSON na serialização/desserialização das mensagens.
-     * Adiciona o JavaTimeModule para lidar corretamente com datas como LocalDateTime.
+     * Jackson 3 inclui suporte a java.time; o contrato do evento permanece JSON.
      */
     @Bean
     public MessageConverter jsonMessageConverter() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        return new Jackson2JsonMessageConverter(objectMapper);
+        JsonMapper objectMapper = JsonMapper.builder().build();
+        return new JacksonJsonMessageConverter(objectMapper);
     }
 
 }

@@ -1,0 +1,982 @@
+{
+  "info": {
+    "_postman_id": "a90b4e23-7158-4721-a3f2-1d54e8cb1890",
+    "name": "SOLID - Docker Compose",
+    "description": "Collection completa para os serviços Payment e Receipt executados via docker-compose.yml.\n\nServiços e portas diretas mapeadas:\n- Payment API: http://localhost:8082 (endpoints em /api/payments/*)\n- Receipt API: http://localhost:8083 (endpoints em /api/receipts/*)\n- RabbitMQ Management: http://localhost:15672 (API em /api/*)\n\nSelecione o ambiente 'SOLID - Docker Compose' para resolução automática das variáveis.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "paymentHost",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "paymentBaseUrl",
+      "value": "http://localhost:8082/api"
+    },
+    {
+      "key": "paymentHealthUrl",
+      "value": "http://localhost:8082/actuator/health"
+    },
+    {
+      "key": "paymentReadinessUrl",
+      "value": "http://localhost:8082/actuator/health/readiness"
+    },
+    {
+      "key": "paymentLivenessUrl",
+      "value": "http://localhost:8082/actuator/health/liveness"
+    },
+    {
+      "key": "receiptHost",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "receiptBaseUrl",
+      "value": "http://localhost:8083/api"
+    },
+    {
+      "key": "receiptHealthUrl",
+      "value": "http://localhost:8083/actuator/health"
+    },
+    {
+      "key": "receiptReadinessUrl",
+      "value": "http://localhost:8083/actuator/health/readiness"
+    },
+    {
+      "key": "receiptLivenessUrl",
+      "value": "http://localhost:8083/actuator/health/liveness"
+    },
+    {
+      "key": "rabbitHost",
+      "value": "http://localhost:15672"
+    },
+    {
+      "key": "rabbitUser",
+      "value": "lab_user"
+    },
+    {
+      "key": "rabbitPass",
+      "value": "rabbit_lab_change_me"
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "pixPaymentId",
+      "value": ""
+    },
+    {
+      "key": "boletoPaymentId",
+      "value": ""
+    },
+    {
+      "key": "unknownPaymentId",
+      "value": "00000000-0000-0000-0000-000000000999"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Payment Service",
+      "description": "Endpoints do microsserviço Payment executando na porta 8082.",
+      "item": [
+        {
+          "name": "Create Payment - Credit Card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 - Pagamento criado com sucesso', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Retorno contém paymentId', function () {",
+                  "    pm.expect(body).to.have.property('paymentId');",
+                  "});",
+                  "pm.test('Status inicial é PENDING', function () {",
+                  "    pm.expect(body.status).to.eql('PENDING');",
+                  "});",
+                  "pm.test('Dados sensíveis do cartão não são retornados', function () {",
+                  "    pm.expect(body).to.not.have.property('cardNumber');",
+                  "    pm.expect(body).to.not.have.property('cvv');",
+                  "});",
+                  "if (body && body.paymentId) {",
+                  "    pm.environment.set('paymentId', body.paymentId);",
+                  "    pm.collectionVariables.set('paymentId', body.paymentId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"amount\": 199.90,\n  \"cardNumber\": \"1234567890123456\",\n  \"cvv\": \"123\"\n}"
+            },
+            "url": "{{paymentBaseUrl}}/payments"
+          }
+        },
+        {
+          "name": "Find Payment by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Pagamento encontrado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "var expectedId = pm.environment.get('paymentId') || pm.collectionVariables.get('paymentId');",
+                  "pm.test('paymentId confere com o criado', function () {",
+                  "    pm.expect(body.paymentId).to.eql(expectedId);",
+                  "});",
+                  "pm.test('Valor confere com o enviado', function () {",
+                  "    pm.expect(body.amount).to.eql(199.90);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/{{paymentId}}"
+          }
+        },
+        {
+          "name": "Refund Payment (Credit Card)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Estorno realizado com sucesso', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Status atualizado para REFUNDED', function () {",
+                  "    pm.expect(body.status).to.eql('REFUNDED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/refund/{{paymentId}}"
+          }
+        },
+        {
+          "name": "Find Payment After Refund",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Pagamento consultado após estorno', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Status confirmado como REFUNDED', function () {",
+                  "    pm.expect(body.status).to.eql('REFUNDED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/{{paymentId}}"
+          }
+        },
+        {
+          "name": "Create Payment - PIX",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 - PIX criado com sucesso', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body && body.paymentId) {",
+                  "    pm.environment.set('pixPaymentId', body.paymentId);",
+                  "    pm.collectionVariables.set('pixPaymentId', body.paymentId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"PIX\",\n  \"amount\": 89.90,\n  \"pixKey\": \"cliente@exemplo.com\"\n}"
+            },
+            "url": "{{paymentBaseUrl}}/payments"
+          }
+        },
+        {
+          "name": "Try Refund PIX (Expected 409 Conflict)",
+          "description": "PIX não permite estorno automático neste simulador. Deve responder 409 Conflict.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409 - Estorno negado para PIX', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/refund/{{pixPaymentId}}"
+          }
+        },
+        {
+          "name": "Create Payment - Boleto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 - Boleto criado com sucesso', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body && body.paymentId) {",
+                  "    pm.environment.set('boletoPaymentId', body.paymentId);",
+                  "    pm.collectionVariables.set('boletoPaymentId', body.paymentId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"BOLETO\",\n  \"amount\": 250.00\n}"
+            },
+            "url": "{{paymentBaseUrl}}/payments"
+          }
+        },
+        {
+          "name": "Find Payment - Boleto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Boleto encontrado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('paymentMethod é BOLETO', function () {",
+                  "    pm.expect(body.paymentMethod).to.eql('BOLETO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/{{boletoPaymentId}}"
+          }
+        },
+        {
+          "name": "Refund Payment (Boleto)",
+          "description": "Boleto permite estorno enquanto estiver com status PENDING.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Estorno de Boleto aceito', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Status é REFUNDED', function () {",
+                  "    pm.expect(body.status).to.eql('REFUNDED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/refund/{{boletoPaymentId}}"
+          }
+        },
+        {
+          "name": "Payment API - Host Instance",
+          "description": "Retorna o hostname do contêiner que processou a requisição.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Hostname retornado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentBaseUrl}}/payments/host"
+          }
+        },
+        {
+          "name": "Error Scenarios",
+          "description": "Validação de respostas de erro da Payment API (400, 404).",
+          "item": [
+            {
+              "name": "Find Payment - Unknown UUID (404)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 404 - Pagamento inexistente', function () {",
+                      "    pm.response.to.have.status(404);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{paymentBaseUrl}}/payments/{{unknownPaymentId}}"
+              }
+            },
+            {
+              "name": "Find Payment - Invalid UUID format (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 400 - UUID em formato inválido', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{paymentBaseUrl}}/payments/not-a-valid-uuid"
+              }
+            },
+            {
+              "name": "Create Payment - Invalid Amount (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 400 - Valor zero ou negativo recusado', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentMethod\": \"BOLETO\",\n  \"amount\": 0.00\n}"
+                },
+                "url": "{{paymentBaseUrl}}/payments"
+              }
+            },
+            {
+              "name": "Create Payment - Invalid Card / CVV (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 400 - Cartão ou CVV inválido', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"amount\": 50.00,\n  \"cardNumber\": \"123\",\n  \"cvv\": \"1\"\n}"
+                },
+                "url": "{{paymentBaseUrl}}/payments"
+              }
+            },
+            {
+              "name": "Create Payment - PIX without pixKey (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 400 - Chave PIX é obrigatória para método PIX', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentMethod\": \"PIX\",\n  \"amount\": 100.00\n}"
+                },
+                "url": "{{paymentBaseUrl}}/payments"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Receipt Service",
+      "description": "Endpoints do microsserviço Receipt executando na porta 8083.\nOs comprovantes são produzidos de forma assíncrona por eventos RabbitMQ. Quando ainda não há comprovante, retorna HTTP 204 No Content. Quando processado, retorna HTTP 200 OK com os dados do comprovante.",
+      "item": [
+        {
+          "name": "Find Receipt - Credit Card Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 (comprovante pronto) ou 204 (processamento assíncrono pendente)', function () {",
+                  "    pm.expect([200, 204]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.test('Comprovante possui paymentId', function () {",
+                  "        pm.expect(body).to.have.property('paymentId');",
+                  "    });",
+                  "    pm.test('Comprovante possui receiptData', function () {",
+                  "        pm.expect(body).to.have.property('receiptData');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptBaseUrl}}/receipts/{{paymentId}}"
+          }
+        },
+        {
+          "name": "Find Receipt - PIX Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 ou 204', function () {",
+                  "    pm.expect([200, 204]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptBaseUrl}}/receipts/{{pixPaymentId}}"
+          }
+        },
+        {
+          "name": "Find Receipt - Boleto Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 ou 204', function () {",
+                  "    pm.expect([200, 204]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptBaseUrl}}/receipts/{{boletoPaymentId}}"
+          }
+        },
+        {
+          "name": "Find Receipt - Unknown Payment (Expected 204)",
+          "description": "Para ID inexistente, a Receipt API retorna 204 No Content.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204 - Nenhum comprovante encontrado', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptBaseUrl}}/receipts/{{unknownPaymentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Observability & Actuator",
+      "description": "Endpoints do Spring Boot Actuator em ambas as APIs para checagem de saúde e probes de contêiner.",
+      "item": [
+        {
+          "name": "Payment API - Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Health UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Status é UP', function () {",
+                  "    pm.expect(body.status).to.eql('UP');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentHealthUrl}}"
+          }
+        },
+        {
+          "name": "Payment API - Readiness Probe",
+          "description": "Mede se a API está pronta para tráfego (inclui conectividade com o PostgreSQL).",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Readiness UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentReadinessUrl}}"
+          }
+        },
+        {
+          "name": "Payment API - Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Liveness UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentLivenessUrl}}"
+          }
+        },
+        {
+          "name": "Payment API - Info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Info endpoint acessível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentHost}}/actuator/info"
+          }
+        },
+        {
+          "name": "Receipt API - Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Health UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test('Status é UP', function () {",
+                  "    pm.expect(body.status).to.eql('UP');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptHealthUrl}}"
+          }
+        },
+        {
+          "name": "Receipt API - Readiness Probe",
+          "description": "Mede se a API está pronta para tráfego (inclui PostgreSQL e RabbitMQ).",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Readiness UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptReadinessUrl}}"
+          }
+        },
+        {
+          "name": "Receipt API - Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Liveness UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptLivenessUrl}}"
+          }
+        },
+        {
+          "name": "Receipt API - Info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Info endpoint acessível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptHost}}/actuator/info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Contracts & Documentation",
+      "description": "Acesso às documentações Swagger UI e contratos estáticos e dinâmicos OpenAPI.",
+      "item": [
+        {
+          "name": "Payment API - Swagger UI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Swagger UI disponível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentHost}}/swagger-ui/index.html"
+          }
+        },
+        {
+          "name": "Payment API - OpenAPI YAML Spec",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Contrato OpenAPI YAML disponível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentHost}}/openapi.yml"
+          }
+        },
+        {
+          "name": "Receipt API - Swagger UI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Swagger UI disponível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptHost}}/swagger-ui/index.html"
+          }
+        },
+        {
+          "name": "Receipt API - OpenAPI v3 docs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - OpenAPI docs JSON disponível', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{receiptHost}}/v3/api-docs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - RabbitMQ Management (Auxiliar)",
+      "description": "Endpoints de gerenciamento do RabbitMQ exposto na porta 15672.",
+      "item": [
+        {
+          "name": "RabbitMQ - Overview",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Overview do Broker', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{rabbitHost}}/api/overview"
+          }
+        },
+        {
+          "name": "RabbitMQ - Queue payment.receipt.queue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Fila de comprovantes encontrada', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{rabbitHost}}/api/queues/%2F/payment.receipt.queue"
+          }
+        },
+        {
+          "name": "RabbitMQ - DLQ payment.receipt.dlq",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 - Fila DLQ encontrada', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{rabbitHost}}/api/queues/%2F/payment.receipt.dlq"
+          }
+        }
+      ]
+    }
+  ]
+}

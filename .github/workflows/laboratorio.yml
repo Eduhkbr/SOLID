@@ -1,0 +1,30 @@
+name: Laboratório de conteinerização
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: laboratorio-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  laboratorio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar build integração e jornadas em containers
+        shell: pwsh
+        run: ./scripts/verify-lab.ps1 -Project 'aula-verify-ci-${{ github.run_id }}' -Python python3
+      - name: Guardar evidências e relatórios de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laboratorio-evidencias
+          path: |
+            .validation/aula-verify-*/runtime.json
+            .validation/aula-verify-*/*.log
+            PaymentSolidApi/target/surefire-reports/
+            PaymentSolidApi/target/failsafe-reports/
+            ReceiptApi/target/surefire-reports/
+            ReceiptApi/target/failsafe-reports/

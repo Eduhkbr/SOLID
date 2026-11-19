@@ -1,0 +1,40 @@
+# Overlay usado somente pela suíte: runner Maven sem socket Docker e sem portas no host.
+services:
+  payment-tests:
+    image: maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
+    profiles: [tests]
+    working_dir: /workspace
+    volumes:
+      - ./PaymentSolidApi:/workspace
+      - maven_test_cache:/root/.m2
+    networks: [payment-db]
+    environment:
+      TEST_DATABASE_URL: jdbc:postgresql://postgres:5432/paymentdb
+      TEST_DATABASE_USER: ${PAYMENT_DB_USER:-payment_app}
+      TEST_DATABASE_PASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD}
+      MAVEN_OPTS: -Xmx1g
+    command: [mvn, --batch-mode, --no-transfer-progress, clean, verify, -Pintegration]
+    mem_limit: 2g
+    cpus: 2.0
+    depends_on:
+      postgres: {condition: service_healthy}
+  receipt-tests:
+    image: maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
+    profiles: [tests]
+    working_dir: /workspace
+    volumes:
+      - ./ReceiptApi:/workspace
+      - maven_test_cache:/root/.m2
+    networks: [receipt-db]
+    environment:
+      TEST_DATABASE_URL: jdbc:postgresql://postgres:5432/receiptdb
+      TEST_DATABASE_USER: ${RECEIPT_DB_USER:-receipt_app}
+      TEST_DATABASE_PASSWORD: ${RECEIPT_DB_PASSWORD:?Defina RECEIPT_DB_PASSWORD}
+      MAVEN_OPTS: -Xmx1g
+    command: [mvn, --batch-mode, --no-transfer-progress, clean, verify, -Pintegration]
+    mem_limit: 2g
+    cpus: 2.0
+    depends_on:
+      postgres: {condition: service_healthy}
+volumes:
+  maven_test_cache:

@@ -10,15 +10,21 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(PaymentNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ResponseEntity<Map<String, String>> handlePaymentNotFound(PaymentNotFoundException ex) {
+        logger.warn("Pagamento não encontrado: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
@@ -27,6 +33,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PaymentValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handlePaymentValidation(PaymentValidationException ex) {
+        logger.warn("Erro de validação de pagamento: {} - detalhes: {}", ex.getClass().getSimpleName(), ex.getErrors());
         Map<String, Object> error = new HashMap<>();
         error.put("error", "Erro de validação");
         error.put("details", ex.getErrors());
@@ -36,6 +43,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PaymentRefundException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ResponseEntity<Map<String, String>> handlePaymentRefundException(PaymentRefundException ex) {
+        logger.warn("Conflito ao processar estorno: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "Conflito ao processar estorno");
         error.put("details", ex.getMessage());
@@ -45,6 +53,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        logger.warn("Erro de validação nos parâmetros: {}", ex.getClass().getSimpleName());
         Map<String, Object> error = new HashMap<>();
         error.put("error", "Erro de validação nos parâmetros");
         error.put("details", ex.getBindingResult().getFieldErrors().stream()
@@ -53,12 +62,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(error);
     }
 
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            jakarta.validation.ConstraintViolationException.class})
+    public ResponseEntity<Map<String, String>> handleInvalidRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Requisição inválida"));
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+        if (ex instanceof org.springframework.web.ErrorResponse errorResponse) {
+            return ResponseEntity.status(errorResponse.getStatusCode()).body(Map.of("error", "Requisição não atendida"));
+        }
+        logger.error("Erro interno do servidor: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "Erro interno do servidor");
-        error.put("details", ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }

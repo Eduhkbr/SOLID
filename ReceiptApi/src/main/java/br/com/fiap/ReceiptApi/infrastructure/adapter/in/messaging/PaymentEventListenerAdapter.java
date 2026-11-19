@@ -1,24 +1,36 @@
 package br.com.fiap.ReceiptApi.infrastructure.adapter.in.messaging;
 
-import br.com.fiap.ReceiptApi.application.port.in.ReceiptService;
+import br.com.fiap.ReceiptApi.application.port.in.ProcessPaymentEventUseCase;
 import br.com.fiap.ReceiptApi.domain.vo.PaymentVO;
 import br.com.fiap.ReceiptApi.infrastructure.adapter.out.dto.PaymentProcessedEventDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @Component
 public class PaymentEventListenerAdapter {
 
-    private final ReceiptService receiptService;
+    private static final Logger logger = LoggerFactory.getLogger(PaymentEventListenerAdapter.class);
 
-    public PaymentEventListenerAdapter(ReceiptService receiptService) {
-        this.receiptService = receiptService;
+    private final ProcessPaymentEventUseCase processPaymentEvent;
+
+    public PaymentEventListenerAdapter(ProcessPaymentEventUseCase processPaymentEvent) {
+        this.processPaymentEvent = processPaymentEvent;
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queue.receipt}")
     public void onPaymentProcessed(PaymentProcessedEventDTO event){
-        System.out.println("LOG: Evento recebido do RabbitMQ: " + event.getPaymentId());
+        validate(event);
+        logger.info("Evento de pagamento recebido: {} com status {}", event.getPaymentId(), event.getStatus());
 
+        UUID eventId = event.getEventId() == null ? legacyEventId(event) : event.getEventId();
+        long aggregateVersion = event.getAggregateVersion() == null
+                ? ("REFUNDED".equals(event.getStatus()) ? 2L : 1L)
+                : event.getAggregateVersion();
         PaymentVO paymentVO = new PaymentVO(
                 event.getPaymentId(),
                 event.getPaymentMethod(),
@@ -27,6 +39,26 @@ public class PaymentEventListenerAdapter {
                 event.getCreatedAt(),
                 event.getProcessedAt());
 
-        receiptService.createReceiptFromPaymentInfo(paymentVO);
+        // O caso de uso só retorna após commit; o container confirma a entrega após o retorno.
+        processPaymentEvent.process(eventId, aggregateVersion, paymentVO);
+    }
+
+    private void validate(PaymentProcessedEventDTO event) {
+        if (event == null || event.getPaymentId() == null || event.getAmount() == null
+                || event.getAmount().signum() <= 0 || event.getAmount().stripTrailingZeros().scale() > 2
+                || event.getCreatedAt() == null || event.getProcessedAt() == null
+                || !java.util.Set.of("PIX", "BOLETO", "CREDIT_CARD").contains(String.valueOf(event.getPaymentMethod()))
+                || !java.util.Set.of("PENDING", "REFUNDED").contains(String.valueOf(event.getStatus()))) {
+            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException("Evento de pagamento inválido");
+        }
+        long expected = "REFUNDED".equals(event.getStatus()) ? 2L : 1L;
+        if (event.getAggregateVersion() != null && event.getAggregateVersion() != expected) {
+            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException("Versão incompatível com o estado do evento");
+        }
+    }
+
+    private UUID legacyEventId(PaymentProcessedEventDTO event) {
+        String identity = event.getPaymentId() + ":" + event.getStatus() + ":" + event.getProcessedAt();
+        return UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
     }
 }

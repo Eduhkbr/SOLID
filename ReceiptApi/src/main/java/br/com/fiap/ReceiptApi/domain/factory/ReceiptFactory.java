@@ -30,7 +30,7 @@ public class ReceiptFactory {
                 paymentVO.id(),
                 paymentVO.paymentMethod(),
                 paymentVO.amount(),
-                LocalDateTime.now(),
+                paymentVO.createdAt(),
                 paymentVO.status()
         );
     }
