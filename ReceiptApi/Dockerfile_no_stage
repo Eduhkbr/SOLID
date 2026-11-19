@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+# ==============================================================================
+# MÁ PRÁTICA DIDÁTICA: Dockerfile de Estágio Único (Single-stage Build)
+# ==============================================================================
+# Este arquivo exemplifica o antipadrão de compilar e executar a aplicação na mesma
+# imagem, sem separar o estágio de compilação (build) do estágio de execução (runtime).
+#
+# Problemas gerados por essa abordagem:
+# 1. Imagem desnecessariamente inflada: carrega o JDK completo (em vez de apenas JRE),
+#    o Maven, o repositório local e todas as ferramentas de compilação para produção.
+# 2. Superfície de ataque ampliada: utilitários de build e compiladores disponíveis no
+#    contêiner facilitam a exploração de vulnerabilidades e invasões.
+# 3. Vazamento de código-fonte e artefatos: o diretório /src e os arquivos intermediários
+#    de compilação permanecem presentes na imagem final distribuída.
+# 4. Desperdício de rede e armazenamento: cada deploy transporta centenas de megabytes
+#    a mais sem qualquer benefício para a execução do serviço.
+# ==============================================================================
+
+FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c
+
+WORKDIR /app
+
+# Copia pom.xml e código-fonte diretamente para o diretório de trabalho do contêiner
+COPY . ./
+
+RUN mvn --batch-mode --no-transfer-progress package
+
+# Copia o JAR compilado para /app/app.jar (o diretório target/ e src/ continuam na imagem)
+RUN cp /app/target/ReceiptApi-0.0.1-SNAPSHOT.jar /app/app.jar
+
+
+# EXPOSE só documenta a porta do serviço
+EXPOSE 8083
+
+# Executa o JAR na mesma imagem em que ele foi compilado
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

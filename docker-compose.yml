@@ -73,7 +73,9 @@ services:
   payment-api:
     <<: *api
     image: ${PAYMENT_IMAGE:-aula-payment:local}
-    build: {context: ./PaymentSolidApi}
+    build:
+      context: ./PaymentSolidApi
+      dockerfile: ${PAYMENT_DOCKERFILE:-Dockerfile}
     ports: ["127.0.0.1:${PAYMENT_PORT:-8082}:8082"]
     networks: [payment-db, payment-mq]
     environment:
@@ -98,7 +100,9 @@ services:
   receipt-api:
     <<: *api
     image: ${RECEIPT_IMAGE:-aula-receipt:local}
-    build: {context: ./ReceiptApi}
+    build:
+      context: ./ReceiptApi
+      dockerfile: Dockerfile
     ports: ["127.0.0.1:${RECEIPT_PORT:-8083}:8083"]
     networks: [receipt-db, receipt-mq]
     environment:
